@@ -1,0 +1,33 @@
+{
+  "questionnaire_id": "baseline-screening-v1",
+  "title": "Baseline Screening Questionnaire",
+  "language": "en",
+  "questions": [
+    {
+      "id": "age_years",
+      "type": "number",
+      "label": "Age (years)",
+      "required": true
+    },
+    {
+      "id": "fatigue",
+      "type": "select",
+      "label": "Fatigue",
+      "required": true,
+      "options": [
+        { "label": "No", "value": "no" },
+        { "label": "Yes", "value": "yes", "risk_weight": 35 }
+      ]
+    },
+    {
+      "id": "dizziness",
+      "type": "select",
+      "label": "Dizziness",
+      "required": true,
+      "options": [
+        { "label": "No", "value": "no" },
+        { "label": "Yes", "value": "yes", "risk_weight": 35 }
+      ]
+    }
+  ]
+}

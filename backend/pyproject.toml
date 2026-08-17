@@ -1,0 +1,19 @@
+[project]
+name = "screening-backend"
+version = "0.1.0"
+description = "Hackathon backend scaffold for independent screening flows"
+requires-python = "==3.13.5"
+dependencies = [
+    "fastapi==0.116.1",
+    "uvicorn[standard]==0.35.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.1",
+    "httpx==0.28.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

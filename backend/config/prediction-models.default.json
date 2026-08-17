@@ -1,0 +1,19 @@
+{
+  "models": [
+    {
+      "key": "baseline-rule-v1",
+      "type": "rules",
+      "description": "Simple baseline for rapid hackathon validation"
+    },
+    {
+      "key": "logreg-v1",
+      "type": "ml",
+      "description": "Logistic regression benchmark candidate"
+    },
+    {
+      "key": "xgboost-v1",
+      "type": "ml",
+      "description": "Tree ensemble benchmark candidate"
+    }
+  ]
+}
