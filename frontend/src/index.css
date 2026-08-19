@@ -152,6 +152,29 @@ h2, h3, p { overflow-wrap: anywhere; }
 .execution-card h2 { font-size: 1.8rem; }
 .execution-card p { margin: 8px 0 6px; color: var(--color-warning); font-weight: 800; }
 .execution-card small { color: var(--color-muted); line-height: 1.45; }
+.execution-card.camera-execution { padding: 10px 18px; grid-template-columns: 52px 1fr; gap: 6px 14px; align-content: start; }
+.camera-execution .execution-mark { width: 44px; height: 44px; font-size: 1.2rem; }
+.camera-execution h2 { font-size: 1.2rem; }
+.camera-execution p { margin: 2px 0; font-size: 0.72rem; }
+.camera-execution small { font-size: 0.6rem; }
+.camera-capture { grid-column: 1 / -1; display: grid; place-items: center; gap: 6px; }
+.camera-viewfinder { width: 100%; display: grid; gap: 6px; }
+.camera-video { width: 100%; max-height: 210px; border: 1px solid var(--color-ink); background: #000; border-radius: 3px; object-fit: contain; }
+.camera-actions { display: flex; gap: 8px; justify-content: center; }
+.camera-actions .button { min-height: 34px; padding: 6px 12px; font-size: 0.68rem; }
+.camera-actions kbd { margin-left: 4px; padding: 1px 3px; border: 1px solid currentColor; font: 700 0.5rem ui-monospace, monospace; }
+.captured-preview { width: 100%; display: grid; gap: 6px; }
+.camera-preview-img { width: 100%; max-height: 210px; border: 1px solid var(--color-ink); border-radius: 3px; object-fit: contain; }
+.camera-options { display: flex; gap: 10px; justify-content: center; align-items: center; min-height: 44px; }
+.camera-options .button { min-height: 38px; padding: 7px 14px; font-size: 0.72rem; }
+.camera-options kbd { margin-left: 4px; padding: 1px 3px; border: 1px solid currentColor; font: 700 0.5rem ui-monospace, monospace; }
+.instant-result.vision-result { grid-template-columns: 1fr; gap: 6px; }
+.vision-scores { display: grid; gap: 3px; padding: 4px 0; }
+.score-bar { display: grid; grid-template-columns: 90px 1fr 55px; align-items: center; gap: 6px; }
+.score-label { font: 700 0.6rem Inter, sans-serif; text-transform: uppercase; }
+.score-track { height: 7px; border: 1px solid var(--color-line); background: var(--color-background-deep); overflow: hidden; }
+.score-fill { height: 100%; background: var(--color-success); transition: width 600ms ease-out; }
+.score-value { font: 700 0.58rem ui-monospace, monospace; text-align: right; }
 .execution-card.physical-execution { min-height: 240px; padding: 14px 24px; grid-template-columns: 64px 1fr; gap: 9px 18px; }
 .physical-execution .execution-mark { width: 58px; height: 58px; font-size: 1.45rem; }
 .physical-execution h2 { font-size: 1.48rem; }

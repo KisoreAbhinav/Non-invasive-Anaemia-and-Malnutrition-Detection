@@ -9,11 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.config_loader import read_json_object
 from app.flows import model_registry
+from app.flows.vision_inference import predict_image
 from app.flows.growth_standards import assess_child_growth
 from app.settings import settings
 
@@ -32,6 +33,7 @@ class PlanRequest(BaseModel):
 class VisualResult(BaseModel):
     test_id: str
     value: Any = None
+    score: float | None = Field(default=None, ge=0, le=1)
     confidence: float | None = Field(default=None, ge=0, le=1)
     invalidated: bool = False
     status: str | None = None
@@ -372,7 +374,7 @@ def calculate_result(payload: ResultRequest) -> dict[str, Any]:
             value, row_status = rendered_value, "complete"
             if threshold_override:
                 test["threshold"] = threshold_override
-            score_value = item.confidence if item.confidence is not None else derived_score
+            score_value = item.score if item.score is not None else item.confidence if item.confidence is not None else derived_score
             if score_value is not None:
                 sensor_scores[test["category"]].append(float(score_value))
             usable_inputs += 1
@@ -566,6 +568,23 @@ async def screening_plan(payload: PlanRequest) -> dict[str, Any]:
 @router.post("/result")
 async def screening_result(payload: ResultRequest) -> dict[str, Any]:
     return calculate_result(payload)
+
+
+@router.post("/vision/{test_id}")
+async def screening_vision(test_id: str, population: str, request: Request) -> dict[str, Any]:
+    if population not in ELIGIBLE_POPULATIONS:
+        raise HTTPException(status_code=422, detail="Unsupported population")
+    plan = build_plan(population, {}, {})
+    if not any(test["id"] == test_id for test in plan["visual_cues"]):
+        raise HTTPException(status_code=404, detail="Test not applicable")
+    if not request.headers.get("content-type", "").startswith("image/"):
+        raise HTTPException(status_code=415, detail="Upload an image/jpeg or image/png body")
+    try:
+        return predict_image(test_id, await request.body())
+    except LookupError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/test-result")

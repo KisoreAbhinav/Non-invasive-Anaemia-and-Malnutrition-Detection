@@ -115,6 +115,11 @@ function App() {
   const [testInputs, setTestInputs] = useState({});
   const [currentTestResult, setCurrentTestResult] = useState(null);
   const [activeClinicalIndex, setActiveClinicalIndex] = useState(0);
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [capturedImageUrl, setCapturedImageUrl] = useState(null);
+  const cameraStreamRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
 
   const sessionRef = useRef(null);
   const captureRef = useRef(null);
@@ -128,6 +133,60 @@ function App() {
 
   useEffect(() => { sessionRef.current = session; }, [session]);
   useEffect(() => { stageRef.current = stage; }, [stage]);
+
+  const closeCamera = useCallback(() => {
+    const stream = cameraStreamRef.current;
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      cameraStreamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
+
+  const setCapturedAndPreview = useCallback((blob) => {
+    if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl);
+    setCapturedImage(blob);
+    setCapturedImageUrl(URL.createObjectURL(blob));
+  }, [capturedImageUrl]);
+
+  const startCamera = useCallback(async () => {
+    closeCamera();
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+      });
+      cameraStreamRef.current = stream;
+      requestAnimationFrame(() => {
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      });
+    } catch {
+      setError("Camera unavailable. Use file upload instead.");
+    }
+  }, [closeCamera]);
+
+  const capturePhoto = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob((blob) => {
+      if (blob) {
+        closeCamera();
+        setCapturedAndPreview(blob);
+      }
+    }, "image/jpeg", 0.92);
+  }, [closeCamera, setCapturedAndPreview]);
+
+  const handleFileUpload = useCallback((event) => {
+    const file = event.target.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      closeCamera();
+      setCapturedAndPreview(file);
+    }
+  }, [closeCamera, setCapturedAndPreview]);
 
   const stopPlayback = useCallback(() => {
     audioRef.current?.pause();
@@ -434,10 +493,16 @@ function App() {
     closeCapture(); setInputMode("physical"); setNotice("Physical input active for this question.");
   }, [closeCapture, stage]);
 
-  useEffect(() => () => { closeCapture(); stopPlayback(); }, [closeCapture, stopPlayback]);
+  useEffect(() => () => {
+    closeCapture(); stopPlayback(); closeCamera();
+    if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl);
+  }, [closeCapture, stopPlayback, closeCamera, capturedImageUrl]);
 
   const resetToIdle = () => {
-    closeCapture(); stopPlayback(); setStage("idle"); setSession(null); setPlan(null);
+    closeCapture(); stopPlayback(); closeCamera();
+    if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+    setCapturedImage(null);
+    setStage("idle"); setSession(null); setPlan(null);
     setFinalResult(null); setVisualResults([]); setClinicalValues({}); setInvalidatedFields([]);
     setInvalidatedSections([]); setTestInputs({}); setNotice(""); setError(""); setLastAnswer(null);
     setCurrentTestResult(null); setActiveClinicalIndex(0);
@@ -514,9 +579,58 @@ function App() {
 
   const moveToNextTest = () => {
     setCurrentTestResult(null);
+    closeCamera();
+    if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+    setCapturedImage(null);
     if (testIndex + 1 < plan.visual_cues.length) setTestIndex((index) => index + 1);
     else { setActiveClinicalIndex(0); setStage("clinical"); }
   };
+
+  // Attach camera stream to video element when it appears
+  useEffect(() => {
+    const stream = cameraStreamRef.current;
+    const video = videoRef.current;
+    if (stream && video && !video.srcObject) {
+      video.srcObject = stream;
+    }
+  });
+
+  const submitVisionTest = useCallback(async (test, imageBlob) => {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(
+        `/api/flows/screening/vision/${test.id}?population=${session.result.population}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "image/jpeg" },
+          body: imageBlob,
+        },
+      );
+      const result = await readApiResponse(response);
+      const displayResult = {
+        classification: result.classification,
+        display: `Scores: ${Object.entries(result.scores).map(([k, v]) => `${k}: ${(v * 100).toFixed(1)}%`).join(", ")}`,
+        threshold: `Confidence: ${(result.confidence * 100).toFixed(1)}%`,
+        spoken_text: `${test.name}. Classification: ${result.classification}. Confidence: ${(result.confidence * 100).toFixed(1)} percent.`,
+        vision_scores: result.scores,
+        vision_primary: result.primary_score,
+      };
+      // Store the vision result in visualResults for final fusion
+      setVisualResults((items) => [
+        ...items.filter((item) => item.test_id !== test.id),
+        {
+          test_id: test.id,
+          value: { scores: result.scores },
+          confidence: result.primary_score,
+          status: "complete",
+        },
+      ]);
+      setCurrentTestResult(displayResult);
+      await speakText(displayResult.spoken_text);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not classify image.");
+    } finally { setBusy(false); }
+  }, [session, speakText]);
 
   const advanceTest = async (skip = false) => {
     closeCapture();
@@ -526,6 +640,7 @@ function App() {
       return;
     }
     const physical = test.execution_type === "physical";
+    const camera = !physical && test.availability.available;
     const physicalValue = testInputs[test.id] ?? {};
     if (!skip && physical) {
       const missing = (test.input_fields ?? []).find(
@@ -547,15 +662,22 @@ function App() {
         return;
       }
     }
+    if (!skip && camera && !capturedImage) {
+      setError("Capture or upload an image before continuing.");
+      return;
+    }
     setError("");
     const recorded = {
       test_id: test.id,
       value: physical && !skip ? physicalValue : null,
       invalidated: skip,
-      status: skip ? "skipped" : physical ? "complete" : test.availability.available ? "placeholder" : "no_model_installed",
+      status: skip ? "skipped" : physical ? "complete" : camera ? "complete" : "no_model_installed",
     };
     setVisualResults((items) => [...items.filter((item) => item.test_id !== test.id), recorded]);
     if (skip) {
+      closeCamera();
+      if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+      setCapturedImage(null);
       moveToNextTest();
       return;
     }
@@ -578,10 +700,15 @@ function App() {
       } finally { setBusy(false); }
       return;
     }
+    if (camera && capturedImage) {
+      await submitVisionTest(test, capturedImage);
+      return;
+    }
+    // No model installed fallback
     const result = {
-      classification: test.availability.available ? "Awaiting model executor" : "No model installed",
-      display: test.availability.available ? "The model is registered but this executor is not connected." : "This test cannot produce a result yet.",
-      spoken_text: `${test.name}. ${test.availability.available ? "The model executor is not connected." : "No model is installed, so no classification was produced."}`,
+      classification: "No model installed",
+      display: "This test cannot produce a result yet.",
+      spoken_text: `${test.name}. No model is installed, so no classification was produced.`,
     };
     setCurrentTestResult(result);
     await speakText(result.spoken_text);
@@ -707,6 +834,21 @@ function App() {
         }
       }
 
+      if (stage === "tests" && has("open camera", "start camera", "take photo")) {
+        startCamera();
+        return true;
+      }
+      if (stage === "tests" && has("capture", "take picture", "snap")) {
+        if (cameraStreamRef.current) { capturePhoto(); return true; }
+      }
+      if (stage === "tests" && has("retake", "try again")) {
+        if (capturedImage) {
+          if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+          setCapturedImage(null);
+          return true;
+        }
+      }
+
       if (has("continue", "next", "begin tests", "start tests", "save measurement", "classify")) {
         if (stage === "visual") beginTests();
         else if (stage === "tests") await advanceTest(false);
@@ -779,6 +921,25 @@ function App() {
           }
         }
         return;
+      }
+      if (stage === "tests" && !currentTestResult && !isInput) {
+        const test = plan?.visual_cues?.[testIndex];
+        const camera = test && !test.execution_type && test.availability.available;
+        if (camera && !capturedImage && event.key === "c") {
+          event.preventDefault(); startCamera(); return;
+        }
+        if (camera && !capturedImage && event.key === "u") {
+          event.preventDefault(); document.getElementById("vision-file-input")?.click(); return;
+        }
+        if (camera && cameraStreamRef.current && event.code === "Space") {
+          event.preventDefault(); capturePhoto(); return;
+        }
+        if (camera && capturedImage && event.key === "r") {
+          event.preventDefault();
+          if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+          setCapturedImage(null);
+          return;
+        }
       }
       if (stage === "tests" && event.key === "Enter") {
         event.preventDefault();
@@ -929,6 +1090,7 @@ function App() {
     if (!test) return null;
     const available = test.availability.available;
     const physical = test.execution_type === "physical";
+    const camera = !physical && available;
     const values = testInputs[test.id] ?? {};
     const muacValue = Number(values.muac_cm);
     const muacDomain = session.result.population === "child_under5" ? [8, 18]
@@ -939,9 +1101,9 @@ function App() {
     return (
       <section className="content execution-screen">
         <p className="eyebrow">Test {testIndex + 1} of {plan.visual_cues.length} · {test.category} · Enter: next/classify · Esc: skip</p>
-        <div className={`execution-card ${physical ? "physical-execution" : ""}`}>
-          <span className={`execution-mark ${available ? "ready" : "missing"}`}>{physical ? "⌨" : available ? "◉" : "—"}</span>
-          <div><h2>{test.name}</h2><p>{physical ? "Enter the measured values" : available ? "Test execution coming soon" : "No model installed — test skipped"}</p><small>{test.description}</small></div>
+        <div className={`execution-card ${physical ? "physical-execution" : camera ? "camera-execution" : ""}`}>
+          <span className={`execution-mark ${physical ? "" : available ? "ready" : "missing"}`}>{physical ? "⌨" : available ? "◉" : "—"}</span>
+          <div><h2>{test.name}</h2><p>{physical ? "Enter the measured values" : available ? "Capture or upload an image" : "No model installed — test skipped"}</p><small>{test.description}</small></div>
           {physical && !currentTestResult && (
             <div className="measurement-grid">
               {(test.input_fields ?? []).map((field) => (
@@ -964,8 +1126,46 @@ function App() {
               ))}
             </div>
           )}
+          {camera && !currentTestResult && (
+            <div className="camera-capture">
+              {cameraStreamRef.current ? (
+                <div className="camera-viewfinder">
+                  <video ref={videoRef} autoPlay playsInline muted className="camera-video" />
+                  <canvas ref={canvasRef} style={{ display: "none" }} />
+                  <div className="camera-actions">
+                    <button className="button primary" type="button" onClick={capturePhoto} disabled={busy}>
+                      Capture <kbd>Space</kbd>
+                    </button>
+                    <button className="button quiet" type="button" onClick={() => { closeCamera(); }}>
+                      Cancel <kbd>Esc</kbd>
+                    </button>
+                  </div>
+                </div>
+              ) : capturedImage ? (
+                <div className="captured-preview">
+                  <img src={capturedImageUrl} alt="Captured" className="camera-preview-img" />
+                  <div className="camera-actions">
+                    <button className="button quiet" type="button" onClick={() => {
+                      if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+                      setCapturedImage(null);
+                    }}>Retake <kbd>R</kbd></button>
+                  </div>
+                </div>
+              ) : (
+                <div className="camera-options">
+                  <button className="button primary" type="button" onClick={startCamera} disabled={busy}>
+                    Open camera <kbd>C</kbd>
+                  </button>
+                  <label className="button quiet" style={{ cursor: "pointer" }}>
+                    Upload image <kbd>U</kbd>
+                    <input id="vision-file-input" type="file" accept="image/*" capture="environment" onChange={handleFileUpload} style={{ display: "none" }} />
+                  </label>
+                </div>
+              )}
+            </div>
+          )}
           {currentTestResult && (
-            <div className="instant-result" aria-live="polite">
+            <div className={`instant-result ${currentTestResult.vision_scores ? "vision-result" : ""}`} aria-live="polite">
               {test.id === "muac" && (
                 <div className="muac-visual" role="img" aria-label={`MUAC marker at ${muacValue} centimetres`}>
                   <div className="muac-tape"><span className="danger-zone"/><span className="warning-zone"/><span className="safe-zone"/>
@@ -978,7 +1178,18 @@ function App() {
                   {String(currentTestResult.display).split(" · ").map((metric) => <span key={metric}>{metric}</span>)}
                 </div>
               )}
-              {!(["muac", "weight_height_z"].includes(test.id)) && (
+              {currentTestResult.vision_scores && (
+                <div className="vision-scores">
+                  {Object.entries(currentTestResult.vision_scores).map(([label, score]) => (
+                    <div key={label} className="score-bar">
+                      <span className="score-label">{label}</span>
+                      <div className="score-track"><div className="score-fill" style={{ width: `${score * 100}%` }} /></div>
+                      <span className="score-value">{(score * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!(["muac", "weight_height_z"].includes(test.id)) && !currentTestResult.vision_scores && (
                 <div className="classification-scan" aria-hidden="true"><span/><b>Measurement classified</b></div>
               )}
               <div><strong>{currentTestResult.classification}</strong><p>{currentTestResult.display}</p><small>{currentTestResult.threshold}</small></div>
@@ -987,7 +1198,7 @@ function App() {
         </div>
         <ActionBar onSkip={() => advanceTest(true)} skipLabel="Skip this test">
           <button className="button primary" type="button" onClick={() => void advanceTest(false)} disabled={busy}>
-            {currentTestResult ? "Next test" : physical ? "Classify measurement" : "Handle test"} →
+            {currentTestResult ? "Next test" : physical ? "Classify measurement" : camera ? "Run inference" : "Handle test"} →
           </button>
         </ActionBar>
       </section>
