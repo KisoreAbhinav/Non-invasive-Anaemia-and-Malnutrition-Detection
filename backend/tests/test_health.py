@@ -1,8 +1,7 @@
-from fastapi.testclient import TestClient
-
 from app.main import app
+from tests.asgi_client import ASGITestClient
 
-client = TestClient(app)
+client = ASGITestClient(app)
 
 
 def test_health_endpoint() -> None:
@@ -13,13 +12,19 @@ def test_health_endpoint() -> None:
 
 
 def test_independent_flow_status_endpoints() -> None:
-    for flow in ("questionnaire", "stt", "tts", "prediction"):
+    expected_statuses = {
+        "questionnaire": "ready",
+        "stt": "ready",
+        "tts": "ready",
+        "prediction": "scaffolded",
+    }
+    for flow, expected_status in expected_statuses.items():
         response = client.get(f"/api/flows/{flow}/status")
 
         assert response.status_code == 200
         body = response.json()
         assert body["flow"] == flow
-        assert body["status"] == "scaffolded"
+        assert body["status"] == expected_status
 
 
 def test_questionnaire_schema_and_prediction_models() -> None:
@@ -39,3 +44,4 @@ def test_runtime_config() -> None:
     body = response.json()
     assert body["runtime_mode"] == "raspi-local"
     assert "audio_execution" in body
+    assert body["audio_execution"]["tts_length_scale"] == 1.2

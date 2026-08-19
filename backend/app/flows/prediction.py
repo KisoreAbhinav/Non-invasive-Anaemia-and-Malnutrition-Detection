@@ -7,7 +7,7 @@ router = APIRouter(prefix="/api/flows/prediction", tags=["prediction"])
 
 
 @router.get("/status")
-def prediction_status() -> dict[str, str]:
+async def prediction_status() -> dict[str, str]:
     return {
         "flow": "prediction",
         "status": "scaffolded",
@@ -16,5 +16,5 @@ def prediction_status() -> dict[str, str]:
 
 
 @router.get("/models")
-def prediction_models() -> dict[str, object]:
+async def prediction_models() -> dict[str, object]:
     return read_json_object(settings.prediction_models_path)

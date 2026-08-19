@@ -1,32 +1,530 @@
 {
-  "questionnaire_id": "baseline-screening-v1",
-  "title": "Baseline Screening Questionnaire",
-  "language": "en",
+  "questionnaire_id": "adaptive-screening-v1",
+  "title": "Voice-led Anaemia and Malnutrition Risk Screening for All Populations",
+  "language": "en-IN",
+  "entry_questions": ["age_years", "is_pregnant"],
+  "population_rules": [
+    { "population": "child_under5", "description": "Age under 5 years" },
+    { "population": "child_5_12", "description": "Age 5 years to under 12 years" },
+    { "population": "pregnant_woman", "description": "Age 12 years or older and pregnant" },
+    { "population": "adult_nonpregnant", "description": "Age 12 years or older and not pregnant" }
+  ],
+  "exit_messages": {},
+  "score_cutoffs": {
+    "child_under5": {
+      "anemia": { "low_below": 0.3, "high_above": 0.6 },
+      "malnutrition": { "low_below": 0.3, "high_above": 0.6 }
+    },
+    "child_5_12": {
+      "anemia": { "low_below": 0.3, "high_above": 0.6 },
+      "malnutrition": { "low_below": 0.3, "high_above": 0.6 }
+    },
+    "pregnant_woman": {
+      "anemia": { "low_below": 0.25, "high_above": 0.55 },
+      "malnutrition": { "low_below": 0.3, "high_above": 0.6 }
+    },
+    "adult_nonpregnant": {
+      "anemia": { "low_below": 0.3, "high_above": 0.6 },
+      "malnutrition": { "low_below": 0.3, "high_above": 0.6 }
+    }
+  },
   "questions": [
     {
       "id": "age_years",
       "type": "number",
-      "label": "Age (years)",
-      "required": true
+      "label": "How old is the person being screened, in completed years?",
+      "required": true,
+      "min": 0,
+      "max": 120
     },
     {
-      "id": "fatigue",
+      "id": "is_pregnant",
       "type": "select",
-      "label": "Fatigue",
+      "label": "Is the person currently pregnant?",
       "required": true,
+      "applies_if": { "question": "age_years", "op": ">=", "value": 12 },
       "options": [
-        { "label": "No", "value": "no" },
-        { "label": "Yes", "value": "yes", "risk_weight": 35 }
+        {
+          "label": "No",
+          "value": "no",
+          "score": 0,
+          "synonyms": ["no", "nah", "nahi", "nahi ji", "negative", "not really", "not pregnant", "no ji"]
+        },
+        {
+          "label": "Yes",
+          "value": "yes",
+          "score": 1,
+          "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "ji haan", "correct", "affirmative", "pregnant"]
+        }
       ]
     },
     {
-      "id": "dizziness",
+      "id": "adult_sex",
       "type": "select",
-      "label": "Dizziness",
+      "label": "What sex was recorded at birth?",
       "required": true,
+      "applies_to": ["adult_nonpregnant"],
       "options": [
-        { "label": "No", "value": "no" },
-        { "label": "Yes", "value": "yes", "risk_weight": 35 }
+        { "label": "Female", "value": "female", "score": 0, "synonyms": ["female", "woman"] },
+        { "label": "Male", "value": "male", "score": 0, "synonyms": ["male", "man"] }
+      ]
+    },
+    {
+      "id": "age_months",
+      "type": "number",
+      "label": "What is the child's age in completed months?",
+      "required": true,
+      "min": 0,
+      "max": 59,
+      "applies_to": ["child_under5"]
+    },
+    {
+      "id": "child_anemia_pica",
+      "type": "select",
+      "label": "Does the child eat or crave ice, dirt, or chalk?",
+      "reference_label": "Pica (ice/dirt/chalk)",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "anemia",
+      "weight": 0.25,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "not at all", "never", "does not", "no ji"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "correct", "does eat it", "craves it", "eats dirt", "eats chalk", "eats ice"] }
+      ]
+    },
+    {
+      "id": "child_anemia_fatigue",
+      "type": "select",
+      "label": "Does the child have fatigue, weakness, or irritability?",
+      "reference_label": "Fatigue/weakness/irritability",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "anemia",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "not really", "normal energy", "active", "no weakness", "not weak", "not tired", "not irritable"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "very tired", "often tired", "weak", "irritable", "low energy", "no stamina", "exhausted", "lethargic"] }
+      ]
+    },
+    {
+      "id": "child_anemia_recent_infection",
+      "type": "select",
+      "label": "Has the child had recent diarrhea or a parasitic infection?",
+      "reference_label": "Recent diarrhea/parasitic infection",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "anemia",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "not recently", "none", "no infection"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "had diarrhea", "loose motions", "stomach infection", "worms", "parasites"] }
+      ]
+    },
+    {
+      "id": "child_anemia_low_iron_food",
+      "type": "select",
+      "label": "Does the child have low iron-rich food intake?",
+      "reference_label": "Low iron-rich food intake",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "anemia",
+      "weight": 0.15,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "eats enough", "good iron diet", "regularly eats iron foods"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "low iron diet", "rarely eats iron foods", "does not eat iron rich food", "poor diet"] }
+      ]
+    },
+    {
+      "id": "child_anemia_premature_low_birth_weight",
+      "type": "select",
+      "label": "Was the child premature or of low birth weight?",
+      "reference_label": "Premature/low birth weight",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "anemia",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "full term", "normal birth weight", "not premature"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "premature", "born early", "low birth weight", "small at birth"] }
+      ]
+    },
+    {
+      "id": "child_anemia_slow_growth",
+      "type": "select",
+      "label": "Does the child have slow growth or delayed milestones?",
+      "reference_label": "Slow growth/delayed milestones",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "anemia",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "growing normally", "milestones on time", "normal growth"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "slow growth", "growth is delayed", "late milestones", "development is delayed"] }
+      ]
+    },
+    {
+      "id": "adult_anemia_pica",
+      "type": "select",
+      "label": "Does the person eat or crave ice, dirt, or chalk?",
+      "reference_label": "Pica",
+      "required": true,
+      "applies_to": ["adult_nonpregnant"],
+      "category": "anemia",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "never", "does not", "no craving"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "craves ice", "eats dirt", "eats chalk", "pica"] }
+      ]
+    },
+    {
+      "id": "adult_anemia_previous",
+      "type": "select",
+      "label": "Has the person previously been diagnosed with anemia?",
+      "reference_label": "Previous anemia",
+      "required": true,
+      "applies_to": ["adult_nonpregnant"],
+      "category": "anemia",
+      "weight": 0.25,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "never", "not diagnosed"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "had anemia", "previously anemic", "diagnosed before"] }
+      ]
+    },
+    {
+      "id": "adult_anemia_blood_loss",
+      "type": "select",
+      "label": "Has there been heavy or unexplained blood loss?",
+      "reference_label": "Heavy or unexplained blood loss",
+      "required": true,
+      "applies_to": ["adult_nonpregnant"],
+      "category": "anemia",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "none", "normal", "no bleeding"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "heavy bleeding", "blood loss", "heavy periods", "unexplained bleeding"] }
+      ]
+    },
+    {
+      "id": "adult_malnutrition_few_meals",
+      "type": "select",
+      "label": "Does the person regularly eat fewer meals than needed?",
+      "reference_label": "Insufficient meal frequency",
+      "required": true,
+      "applies_to": ["adult_nonpregnant"],
+      "category": "malnutrition",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "enough meals", "eats regularly"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "few meals", "misses meals", "does not eat enough"] }
+      ]
+    },
+    {
+      "id": "adult_malnutrition_food_insecurity",
+      "type": "select",
+      "label": "Does the household experience food insecurity?",
+      "reference_label": "Household food insecurity",
+      "required": true,
+      "applies_to": ["adult_nonpregnant"],
+      "category": "malnutrition",
+      "weight": 0.15,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "enough food", "food secure"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "not enough food", "food shortage", "go hungry"] }
+      ]
+    },
+    {
+      "id": "pregnant_anemia_previous",
+      "type": "select",
+      "label": "Was anemia present in a previous pregnancy?",
+      "reference_label": "Previous pregnancy anemia",
+      "required": true,
+      "applies_to": ["pregnant_woman"],
+      "category": "anemia",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "not before", "never had anemia", "first pregnancy"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "had anemia before", "previously anemic", "anemia last pregnancy"] }
+      ]
+    },
+    {
+      "id": "pregnant_anemia_symptoms",
+      "type": "select",
+      "label": "Are there fatigue, dizziness, or breathlessness symptoms?",
+      "reference_label": "Fatigue/dizziness/breathlessness",
+      "required": true,
+      "applies_to": ["pregnant_woman", "adult_nonpregnant"],
+      "category": "anemia",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "not really", "none", "feeling fine", "normal energy"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "really tired", "often dizzy", "short of breath", "breathless", "weak lately"] }
+      ]
+    },
+    {
+      "id": "pregnant_anemia_no_iron_folic",
+      "type": "select",
+      "label": "Is the person not taking iron and folic acid supplements?",
+      "reference_label": "Not taking iron/folic acid",
+      "required": true,
+      "applies_to": ["pregnant_woman"],
+      "category": "anemia",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "taking them", "takes supplements", "takes iron", "takes folic acid"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "not taking them", "misses supplements", "no iron tablets", "stopped tablets"] }
+      ]
+    },
+    {
+      "id": "pregnant_anemia_heavy_periods",
+      "type": "select",
+      "label": "Were periods heavy before pregnancy?",
+      "reference_label": "Heavy periods pre-pregnancy",
+      "required": true,
+      "applies_to": ["pregnant_woman"],
+      "category": "anemia",
+      "weight": 0.15,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "normal periods", "not heavy", "light periods"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "very heavy", "heavy bleeding", "heavy flow"] }
+      ]
+    },
+    {
+      "id": "pregnant_anemia_low_iron_diet",
+      "type": "select",
+      "label": "Is the person vegetarian or vegan with low iron intake?",
+      "reference_label": "Vegetarian/vegan, low iron",
+      "required": true,
+      "applies_to": ["pregnant_woman", "adult_nonpregnant"],
+      "category": "anemia",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "enough iron", "good iron intake", "not vegetarian"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "vegetarian", "vegan", "low iron diet", "rarely eats iron foods"] }
+      ]
+    },
+    {
+      "id": "pregnant_anemia_multiple",
+      "type": "select",
+      "label": "Is this a twin or multiple pregnancy?",
+      "reference_label": "Twin/multiple pregnancy",
+      "required": true,
+      "applies_to": ["pregnant_woman"],
+      "category": "anemia",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "single baby", "singleton", "not twins"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "twins", "multiple babies", "more than one baby"] }
+      ]
+    },
+    {
+      "id": "pregnant_anemia_gi_condition",
+      "type": "select",
+      "label": "Is there a gastrointestinal absorption condition?",
+      "reference_label": "GI absorption condition",
+      "required": true,
+      "applies_to": ["pregnant_woman", "adult_nonpregnant"],
+      "category": "anemia",
+      "weight": 0.05,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "none", "no condition", "not diagnosed"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "absorption problem", "gut condition", "celiac disease", "bowel condition"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_low_diversity",
+      "type": "select",
+      "label": "In the last 24 hours, was dietary diversity below the age-appropriate minimum?",
+      "reference_label": "Dietary diversity (WHO Minimum Dietary Diversity-style, 24h food groups)",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "malnutrition",
+      "weight": 0.25,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "varied diet", "many food groups", "ate different foods", "good variety"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "poor variety", "few food groups", "same food", "not diverse"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_few_meals",
+      "type": "select",
+      "label": "Are meals per day below the age minimum?",
+      "reference_label": "Meals/day below age minimum",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "malnutrition",
+      "weight": 0.15,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "enough meals", "eats regularly", "meets minimum"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "too few meals", "misses meals", "does not eat enough", "below minimum"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_recent_illness",
+      "type": "select",
+      "label": "Has the child had illness or diarrhea in the last two weeks?",
+      "reference_label": "Illness/diarrhea (2 wks)",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "malnutrition",
+      "weight": 0.15,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "not sick", "healthy", "no diarrhea", "not in two weeks"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "was sick", "had diarrhea", "loose motions", "recent illness"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_food_insecurity",
+      "type": "select",
+      "label": "Does the household experience food insecurity?",
+      "reference_label": "Household food insecurity",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "malnutrition",
+      "weight": 0.15,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "enough food", "food is available", "food secure"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "not enough food", "food shortage", "sometimes go hungry", "cannot afford food"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_not_exclusive_breastfeeding",
+      "type": "select",
+      "label": "Is the infant not exclusively breastfed?",
+      "reference_label": "Not exclusively breastfed (0–6mo)",
+      "required": true,
+      "applies_to": ["child_under5"],
+      "applies_if": { "question": "age_months", "op": "<=", "value": 6 },
+      "category": "malnutrition",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "exclusively breastfed", "only breast milk", "breast milk only"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "not exclusive", "also formula", "other food", "not only breast milk"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_milestones",
+      "type": "select",
+      "label": "Are developmental milestones not met?",
+      "reference_label": "Milestones not met",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "malnutrition",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "milestones met", "development on time", "normal development"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "milestones delayed", "not on time", "development delayed"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_vaccination",
+      "type": "select",
+      "label": "Are vaccinations not up to date?",
+      "reference_label": "Vaccination not up to date",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "malnutrition",
+      "weight": 0.05,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "up to date", "all vaccines", "fully vaccinated"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "vaccines missing", "not vaccinated", "missed vaccination", "overdue vaccines"] }
+      ]
+    },
+    {
+      "id": "child_malnutrition_low_birth_weight",
+      "type": "select",
+      "label": "Did the child have low birth weight?",
+      "reference_label": "Low birth weight",
+      "required": true,
+      "applies_to": ["child_under5", "child_5_12"],
+      "category": "malnutrition",
+      "weight": 0.05,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "normal birth weight", "healthy weight at birth", "not low"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "low birth weight", "small at birth", "underweight at birth"] }
+      ]
+    },
+    {
+      "id": "pregnant_malnutrition_low_diversity",
+      "type": "select",
+      "label": "In the last 24 hours, was dietary diversity low?",
+      "reference_label": "Dietary diversity (24h)",
+      "required": true,
+      "applies_to": ["pregnant_woman", "adult_nonpregnant"],
+      "category": "malnutrition",
+      "weight": 0.25,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "varied diet", "many food groups", "ate different foods", "good variety"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "poor variety", "few food groups", "same food", "not diverse"] }
+      ]
+    },
+    {
+      "id": "pregnant_malnutrition_no_prenatal_supplements",
+      "type": "select",
+      "label": "Is the person not taking prenatal supplements?",
+      "reference_label": "Not taking prenatal supplements",
+      "required": true,
+      "applies_to": ["pregnant_woman"],
+      "category": "malnutrition",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "taking supplements", "takes them daily", "taking prenatal tablets"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "not taking supplements", "misses supplements", "stopped supplements", "no prenatal tablets"] }
+      ]
+    },
+    {
+      "id": "pregnant_malnutrition_nausea",
+      "type": "select",
+      "label": "Is there severe nausea or vomiting?",
+      "reference_label": "Severe nausea/vomiting",
+      "required": true,
+      "applies_to": ["pregnant_woman", "adult_nonpregnant"],
+      "category": "malnutrition",
+      "weight": 0.20,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "not severe", "no vomiting", "mild nausea"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "severe vomiting", "vomits often", "cannot keep food down", "very nauseous"] }
+      ]
+    },
+    {
+      "id": "pregnant_malnutrition_high_parity",
+      "type": "select",
+      "label": "Has the person previously given birth three or more times?",
+      "reference_label": "High parity (3+ births)",
+      "required": true,
+      "applies_to": ["pregnant_woman"],
+      "category": "malnutrition",
+      "weight": 0.15,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "less than three", "first pregnancy", "one birth", "two births"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "three births", "more than three", "many previous births", "three or more"] }
+      ]
+    },
+    {
+      "id": "pregnant_malnutrition_demanding_work",
+      "type": "select",
+      "label": "Does the person have a physically demanding occupation?",
+      "reference_label": "Physically demanding occupation",
+      "required": true,
+      "applies_to": ["pregnant_woman", "adult_nonpregnant"],
+      "category": "malnutrition",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "light work", "desk work", "not demanding"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "heavy work", "manual labour", "physical job", "hard physical work"] }
+      ]
+    },
+    {
+      "id": "pregnant_malnutrition_chronic_condition",
+      "type": "select",
+      "label": "Is there a chronic health condition?",
+      "reference_label": "Chronic condition (confounder flag)",
+      "required": true,
+      "applies_to": ["pregnant_woman", "adult_nonpregnant"],
+      "category": "malnutrition",
+      "weight": 0.10,
+      "options": [
+        { "label": "No", "value": "no", "score": 0, "synonyms": ["no", "nah", "nahi", "none", "no condition", "not diagnosed", "healthy"] },
+        { "label": "Yes", "value": "yes", "score": 1, "synonyms": ["yes", "yeah", "yep", "haan", "haan ji", "haanji", "chronic illness", "long term condition", "ongoing health problem", "diagnosed condition"] }
       ]
     }
   ]
