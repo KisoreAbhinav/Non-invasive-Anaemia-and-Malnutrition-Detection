@@ -1,0 +1,163 @@
+{
+  "fusion": { "questionnaire_weight": 0.3, "sensor_weight": 0.7 },
+  "tests": [
+    {
+      "id": "pallor",
+      "name": "Conjunctival, nail, palm & tongue pallor",
+      "description": "Camera inspection for pallor-related anemia risk; this is a probabilistic risk estimate, not an Hb reading.",
+      "category": "anemia",
+      "populations": ["child_under5", "child_5_12", "pregnant_woman", "adult_nonpregnant"],
+      "base_priority": 80,
+      "threshold": "Clinical pallor risk (probabilistic)",
+      "overrides_verdict": false
+    },
+    {
+      "id": "muac",
+      "name": "Mid-upper arm circumference (MUAC)",
+      "description": "Physical tape measurement of mid-upper arm circumference; no camera model is used.",
+      "category": "malnutrition",
+      "populations": ["child_under5", "child_5_12", "pregnant_woman", "adult_nonpregnant"],
+      "base_priority": 90,
+      "execution_type": "physical",
+      "input_fields": [
+        { "id": "muac_cm", "label": "MUAC", "unit": "cm", "type": "number", "min": 5, "max": 60 }
+      ],
+      "thresholds": {
+        "child_under5": "<11.5 cm SAM; 11.5–12.5 cm MAM; ≥12.5 cm normal",
+        "child_5_12": "WHO/clinical age reference required",
+        "pregnant_woman": "<23 cm at risk"
+      },
+      "overrides_verdict": false
+    },
+    {
+      "id": "weight_height_z",
+      "name": "WHO weight and height indicators",
+      "description": "Physical weight and length/height converted to sex- and age-specific WHO Z-scores.",
+      "category": "malnutrition",
+      "populations": ["child_under5", "child_5_12"],
+      "base_priority": 70,
+      "execution_type": "physical",
+      "input_fields": [
+        { "id": "sex", "label": "Sex", "type": "select", "options": [{ "label": "Male", "value": "male" }, { "label": "Female", "value": "female" }] },
+        { "id": "age_months", "label": "Age", "unit": "months", "type": "number", "min": 0, "max": 143 },
+        { "id": "weight_kg", "label": "Weight", "unit": "kg", "type": "number", "min": 1, "max": 200 },
+        { "id": "height_cm", "label": "Length / height", "unit": "cm", "type": "number", "min": 40, "max": 220 }
+      ],
+      "threshold": "WHO 2006 standards (0–5); WHO 2007 reference (5–12)",
+      "overrides_verdict": false
+    },
+    {
+      "id": "edema",
+      "name": "Bilateral pitting edema",
+      "description": "Foot or shin grid deformation check for pitting and recovery grade (1+ to 4+).",
+      "category": "malnutrition",
+      "populations": ["child_under5", "child_5_12", "pregnant_woman", "adult_nonpregnant"],
+      "base_priority": 85,
+      "threshold": "Positive pitting edema; pregnancy edema is a confounder",
+      "overrides_verdict": true,
+      "override_populations": ["child_under5", "child_5_12"],
+      "override_classification": "Severe"
+    },
+    {
+      "id": "hair_skin",
+      "name": "Hair, skin & visible wasting signs",
+      "description": "Camera check for hair texture or color, skin lesions or flaking, and visible wasting.",
+      "category": "malnutrition",
+      "populations": ["child_under5", "child_5_12", "pregnant_woman", "adult_nonpregnant"],
+      "base_priority": 50,
+      "threshold": "Qualitative clinical corroboration",
+      "overrides_verdict": false
+    },
+    {
+      "id": "adult_bmi",
+      "name": "Adult body mass index (BMI)",
+      "description": "Physical weight and height converted to BMI and compared with WHO adult categories.",
+      "category": "malnutrition",
+      "populations": ["adult_nonpregnant"],
+      "base_priority": 75,
+      "execution_type": "physical",
+      "input_fields": [
+        { "id": "weight_kg", "label": "Weight", "unit": "kg", "type": "number", "min": 20, "max": 300 },
+        { "id": "height_cm", "label": "Height", "unit": "cm", "type": "number", "min": 100, "max": 250 }
+      ],
+      "threshold": "WHO adult BMI: <18.5 underweight; ≥25 overweight; ≥30 obesity",
+      "overrides_verdict": false
+    },
+    {
+      "id": "prepregnancy_bmi",
+      "name": "Pre-pregnancy BMI",
+      "description": "Baseline height and pre-pregnancy weight compared with BMI bands.",
+      "category": "malnutrition",
+      "populations": ["pregnant_woman"],
+      "base_priority": 75,
+      "execution_type": "physical",
+      "input_fields": [
+        { "id": "weight_kg", "label": "Pre-pregnancy weight", "unit": "kg", "type": "number", "min": 20, "max": 300 },
+        { "id": "height_cm", "label": "Height", "unit": "cm", "type": "number", "min": 100, "max": 250 }
+      ],
+      "threshold": "<18.5 underweight; 18.5–24.9 normal; ≥25 overweight",
+      "overrides_verdict": false
+    },
+    {
+      "id": "gestational_weight_gain",
+      "name": "Gestational weight-gain trend",
+      "description": "Weight change across two or more visits compared with IOM gestational weight-gain charts.",
+      "category": "malnutrition",
+      "populations": ["pregnant_woman"],
+      "base_priority": 65,
+      "execution_type": "physical",
+      "input_fields": [
+        { "id": "pre_weight_kg", "label": "Pre-pregnancy weight", "unit": "kg", "type": "number", "min": 20, "max": 300 },
+        { "id": "current_weight_kg", "label": "Current weight", "unit": "kg", "type": "number", "min": 20, "max": 350 },
+        { "id": "gestation_weeks", "label": "Gestation", "unit": "weeks", "type": "number", "min": 1, "max": 42 }
+      ],
+      "threshold": "IOM gestational weight-gain chart; requires 2+ visits",
+      "overrides_verdict": false
+    },
+    {
+      "id": "fundal_height",
+      "name": "Fundal height",
+      "description": "Manual abdomen measurement used as a rough fetal-growth proxy against gestational age.",
+      "category": "malnutrition",
+      "populations": ["pregnant_woman"],
+      "base_priority": 45,
+      "execution_type": "physical",
+      "input_fields": [
+        { "id": "fundal_height_cm", "label": "Fundal height", "unit": "cm", "type": "number", "min": 10, "max": 50 },
+        { "id": "gestation_weeks", "label": "Gestation", "unit": "weeks", "type": "number", "min": 12, "max": 42 }
+      ],
+      "threshold": "Centimetres approximately equal weeks gestation (rough rule)",
+      "overrides_verdict": false
+    }
+  ],
+  "question_test_mapping": {
+    "child_anemia_pica": { "tests": ["pallor"], "boost": 28 },
+    "child_anemia_fatigue": { "tests": ["pallor"], "boost": 25 },
+    "child_anemia_recent_infection": { "tests": ["pallor"], "boost": 16 },
+    "child_anemia_low_iron_food": { "tests": ["pallor"], "boost": 18 },
+    "child_anemia_premature_low_birth_weight": { "tests": ["pallor"], "boost": 12 },
+    "child_anemia_slow_growth": { "tests": ["pallor"], "boost": 12 },
+    "pregnant_anemia_previous": { "tests": ["pallor"], "boost": 26 },
+    "pregnant_anemia_symptoms": { "tests": ["pallor"], "boost": 28 },
+    "pregnant_anemia_no_iron_folic": { "tests": ["pallor"], "boost": 22 },
+    "pregnant_anemia_heavy_periods": { "tests": ["pallor"], "boost": 18 },
+    "pregnant_anemia_low_iron_diet": { "tests": ["pallor"], "boost": 14 },
+    "child_malnutrition_low_diversity": { "tests": ["weight_height_z", "muac"], "boost": 34 },
+    "child_malnutrition_few_meals": { "tests": ["muac", "weight_height_z"], "boost": 26 },
+    "child_malnutrition_recent_illness": { "tests": ["edema", "hair_skin"], "boost": 25 },
+    "child_malnutrition_food_insecurity": { "tests": ["muac", "weight_height_z"], "boost": 22 },
+    "child_malnutrition_milestones": { "tests": ["weight_height_z", "hair_skin"], "boost": 18 },
+    "child_malnutrition_low_birth_weight": { "tests": ["weight_height_z", "muac"], "boost": 15 },
+    "pregnant_malnutrition_low_diversity": { "tests": ["muac", "prepregnancy_bmi", "hair_skin"], "boost": 30 },
+    "pregnant_malnutrition_no_prenatal_supplements": { "tests": ["hair_skin", "muac"], "boost": 25 },
+    "pregnant_malnutrition_nausea": { "tests": ["gestational_weight_gain", "muac"], "boost": 30 },
+    "pregnant_malnutrition_high_parity": { "tests": ["gestational_weight_gain", "fundal_height"], "boost": 20 },
+    "pregnant_malnutrition_demanding_work": { "tests": ["gestational_weight_gain", "muac"], "boost": 16 },
+    "pregnant_malnutrition_chronic_condition": { "tests": ["gestational_weight_gain", "fundal_height"], "boost": 18 }
+    ,"adult_anemia_pica": { "tests": ["pallor"], "boost": 25 }
+    ,"adult_anemia_previous": { "tests": ["pallor"], "boost": 24 }
+    ,"adult_anemia_blood_loss": { "tests": ["pallor"], "boost": 24 }
+    ,"adult_malnutrition_few_meals": { "tests": ["adult_bmi", "muac"], "boost": 22 }
+    ,"adult_malnutrition_food_insecurity": { "tests": ["adult_bmi", "muac"], "boost": 20 }
+  }
+}
