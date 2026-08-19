@@ -46,6 +46,8 @@ DEFAULTS: dict[str, Any] = {
     "val_split": 0.15,
     "num_workers": 0,
     "class_weights": "none",
+    "color_space": "RGB",
+    "pretrained": True,
     "preprocessing": {
         "color_space": "RGB",
         "resize": [224, 224],
@@ -77,23 +79,39 @@ class TransformSubset(torch.utils.data.Dataset):
 
 # ── Data ──────────────────────────────────────────────────────────────
 
-def build_transforms(image_size: int, mean: list[float], std: list[float], train: bool = True) -> transforms.Compose:
+def build_transforms(
+    image_size: int,
+    mean: list[float],
+    std: list[float],
+    train: bool = True,
+    color_space: str = "RGB",
+) -> transforms.Compose:
+    steps = []
     if train:
-        return transforms.Compose([
+        steps += [
             transforms.Resize(image_size + 32),
             transforms.RandomCrop(image_size),
             transforms.RandomHorizontalFlip(),
             transforms.RandomRotation(15),
             transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=mean, std=std),
-        ])
-    return transforms.Compose([
-        transforms.Resize(image_size + 32),
-        transforms.CenterCrop(image_size),
+        ]
+    else:
+        steps += [
+            transforms.Resize(image_size + 32),
+            transforms.CenterCrop(image_size),
+        ]
+    if color_space.lower() == "lab":
+        # PIL Lab: L (0-255→0-100), a/b (0-255, centered at 128)
+        # After ToTensor (/255): L≈[0,0.392], a/b≈[0,1] centered 0.5
+        # Normalize to ~N(0,1): mean≈[0.5,0.5,0.5], std≈[0.5,0.25,0.25]
+        mean = [0.5, 0.5, 0.5]
+        std = [0.5, 0.25, 0.25]
+        steps.append(transforms.Lambda(lambda img: img.convert("LAB")))
+    steps += [
         transforms.ToTensor(),
         transforms.Normalize(mean=mean, std=std),
-    ])
+    ]
+    return transforms.Compose(steps)
 
 
 def build_dataloaders(
@@ -104,9 +122,10 @@ def build_dataloaders(
     batch_size: int,
     val_split: float,
     num_workers: int,
+    color_space: str = "RGB",
 ) -> tuple[DataLoader, DataLoader, list[str]]:
-    train_tf = build_transforms(image_size, mean, std, train=True)
-    val_tf = build_transforms(image_size, mean, std, train=False)
+    train_tf = build_transforms(image_size, mean, std, train=True, color_space=color_space)
+    val_tf = build_transforms(image_size, mean, std, train=False, color_space=color_space)
 
     full_dataset = datasets.ImageFolder(str(data_dir), transform=train_tf)
     class_names = full_dataset.classes
@@ -184,6 +203,8 @@ class TrainConfig:
     num_workers: int = 0
     class_weights: str = "none"
     output_activation: str = "softmax"
+    color_space: str = "RGB"
+    pretrained: bool = True
     preprocessing: dict[str, Any] = field(default_factory=lambda: dict(DEFAULTS["preprocessing"]))
 
     @classmethod
@@ -251,9 +272,10 @@ def train(config: TrainConfig) -> Path:
     train_loader, val_loader, class_names = build_dataloaders(
         data_dir, config.image_size, mean, std,
         config.batch_size, config.val_split, config.num_workers,
+        config.color_space,
     )
 
-    model = build_model(config.backbone, config.num_classes, pretrained=True)
+    model = build_model(config.backbone, config.num_classes, pretrained=config.pretrained)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = model.to(device)
     LOGGER.info("Using device: %s", device)

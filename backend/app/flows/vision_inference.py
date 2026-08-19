@@ -16,6 +16,11 @@ def _image_tensor(image_bytes: bytes, metadata: dict[str, Any]) -> Any:
     except (UnidentifiedImageError, OSError) as exc:
         raise ValueError("upload must be a readable image") from exc
 
+    # Convert color space if needed (e.g., CIELAB for pallor detection)
+    color_space = metadata.get("preprocessing", {}).get("color_space", "RGB")
+    if color_space.upper() == "LAB":
+        image = image.convert("LAB")
+
     shape = metadata["input_shape"]
     if len(shape) != 4 or shape[0] != 1 or shape[1] != 3:
         raise ValueError("only [1, 3, height, width] image models are supported")
