@@ -23,8 +23,23 @@ def _image_tensor(image_bytes: bytes, metadata: dict[str, Any]) -> Any:
     resize = preprocessing.get("resize", [shape[3], shape[2]])
     if not isinstance(resize, list) or len(resize) != 2:
         raise ValueError("preprocessing.resize must be [width, height]")
-    width, height = int(resize[0]), int(resize[1])
-    image = image.resize((width, height))
+    target_w, target_h = int(resize[0]), int(resize[1])
+    # Resize preserving aspect ratio (shorter side to target, matching torchvision Resize)
+    w, h = image.size
+    scale_factor = min(target_w / w, target_h / h) if w != target_w or h != target_h else 1.0
+    new_w, new_h = int(w * scale_factor), int(h * scale_factor)
+    image = image.resize((new_w, new_h))
+
+    # Center crop if specified
+    center_crop = preprocessing.get("center_crop")
+    if center_crop:
+        cc = int(center_crop)
+        left = (new_w - cc) // 2
+        top = (new_h - cc) // 2
+        image = image.crop((left, top, left + cc, top + cc))
+
+    if not center_crop and (new_w != target_w or new_h != target_h):
+        image = image.resize((target_w, target_h))
 
     import torch
 
@@ -38,6 +53,45 @@ def _image_tensor(image_bytes: bytes, metadata: dict[str, Any]) -> Any:
         std_tensor = torch.tensor(std, dtype=tensor.dtype).view(1, 3, 1, 1)
         tensor = (tensor - mean_tensor) / std_tensor
     return tensor
+
+
+def predict_batch(sub_captures: list[dict[str, Any]], image_bytes_list: list[bytes]) -> dict[str, Any]:
+    """Run inference on multiple images (e.g. pallor eye/nail/tongue) and combine.
+
+    Each entry in *sub_captures* has ``id`` (model dir name), ``label``, etc.
+    Returns a single combined result with averaged scores.
+    """
+    if len(sub_captures) != len(image_bytes_list):
+        raise ValueError(f"Expected {len(sub_captures)} images, got {len(image_bytes_list)}")
+
+    per_image: list[dict[str, Any]] = []
+    for capture, img_bytes in zip(sub_captures, image_bytes_list):
+        result = predict_image(capture["id"], img_bytes)
+        result["label"] = capture.get("label", capture["id"])
+        per_image.append(result)
+
+    # Average primary scores across all body sites
+    primary_key = per_image[0]["primary_score_key"]
+    all_scores = [r["primary_score"] for r in per_image]
+    avg_primary = sum(all_scores) / len(all_scores)
+
+    # Build combined class scores by averaging each label across images
+    combined_scores: dict[str, float] = {}
+    for label in per_image[0]["scores"]:
+        label_vals = [r["scores"][label] for r in per_image if label in r["scores"]]
+        combined_scores[label] = round(sum(label_vals) / len(label_vals), 6)
+
+    top_label = max(combined_scores, key=combined_scores.get)
+    return {
+        "test_id": "pallor",
+        "scores": combined_scores,
+        "primary_score": round(avg_primary, 6),
+        "primary_score_key": primary_key,
+        "classification": top_label,
+        "confidence": combined_scores[top_label],
+        "per_image": per_image,
+        "provenance": per_image[0].get("provenance", {}),
+    }
 
 
 def predict_image(test_id: str, image_bytes: bytes) -> dict[str, Any]:
