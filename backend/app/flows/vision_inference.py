@@ -26,7 +26,10 @@ def _image_tensor(image_bytes: bytes, metadata: dict[str, Any]) -> Any:
     target_w, target_h = int(resize[0]), int(resize[1])
     # Resize preserving aspect ratio (shorter side to target, matching torchvision Resize)
     w, h = image.size
-    scale_factor = min(target_w / w, target_h / h) if w != target_w or h != target_h else 1.0
+    if target_w == target_h:
+        scale_factor = target_w / min(w, h)
+    else:
+        scale_factor = min(target_w / w, target_h / h)
     new_w, new_h = int(w * scale_factor), int(h * scale_factor)
     image = image.resize((new_w, new_h))
 
