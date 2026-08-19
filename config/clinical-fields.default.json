@@ -1,0 +1,62 @@
+{
+  "populations": {
+    "child_under5": {
+      "anemia": {
+        "moderate": ["hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"],
+        "high": ["hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"]
+      },
+      "malnutrition": {
+        "moderate": ["blood_glucose", "electrolytes", "prealbumin"],
+        "high": ["blood_glucose", "electrolytes", "prealbumin"]
+      }
+    },
+    "child_5_12": {
+      "anemia": {
+        "moderate": ["hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"],
+        "high": ["hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"]
+      },
+      "malnutrition": {
+        "moderate": ["blood_glucose", "electrolytes", "prealbumin"],
+        "high": ["blood_glucose", "electrolytes", "prealbumin"]
+      }
+    },
+    "pregnant_woman": {
+      "anemia": {
+        "moderate": ["trimester", "hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"],
+        "high": ["trimester", "hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"]
+      },
+      "malnutrition": {
+        "moderate": ["albumin", "blood_glucose", "folate", "vitamin_b12", "calcium", "vitamin_d", "zinc"],
+        "high": ["albumin", "blood_glucose", "folate", "vitamin_b12", "calcium", "vitamin_d", "zinc"]
+      }
+    },
+    "adult_nonpregnant": {
+      "anemia": {
+        "moderate": ["hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"],
+        "high": ["hemoglobin", "hematocrit", "mcv", "ferritin", "iron", "tibc"]
+      },
+      "malnutrition": {
+        "moderate": ["albumin", "blood_glucose", "electrolytes", "prealbumin", "folate", "vitamin_b12"],
+        "high": ["albumin", "blood_glucose", "electrolytes", "prealbumin", "folate", "vitamin_b12"]
+      }
+    }
+  },
+  "fields": {
+    "trimester": { "label": "Trimester (1, 2 or 3)", "unit": "", "type": "number", "optional": false, "source": "§7" },
+    "hemoglobin": { "label": "Hemoglobin (Hb)", "unit": "g/dL", "type": "number", "optional": false, "source": "§3b/§6/§7" },
+    "hematocrit": { "label": "Hematocrit (Hct)", "unit": "%", "type": "number", "optional": true, "source": "§3b/§6" },
+    "mcv": { "label": "Mean corpuscular volume (MCV)", "unit": "fL", "type": "number", "optional": true, "source": "§3b/§6/§7" },
+    "ferritin": { "label": "Ferritin", "unit": "ng/mL", "type": "number", "optional": true, "source": "§3b/§6/§7" },
+    "iron": { "label": "Serum iron", "unit": "µg/dL", "type": "number", "optional": true, "source": "§3b/§6" },
+    "tibc": { "label": "Total iron-binding capacity (TIBC)", "unit": "µg/dL", "type": "number", "optional": true, "source": "§3b/§6" },
+    "albumin": { "label": "Albumin", "unit": "g/dL", "type": "number", "optional": true, "source": "§5/§7" },
+    "blood_glucose": { "label": "Blood glucose", "unit": "mg/dL", "type": "number", "optional": true, "source": "§4/§5" },
+    "electrolytes": { "label": "Electrolytes", "unit": "result", "type": "text", "optional": true, "source": "§4" },
+    "prealbumin": { "label": "Prealbumin", "unit": "mg/dL", "type": "number", "optional": true, "source": "§3d/§4" },
+    "folate": { "label": "Folate", "unit": "ng/mL", "type": "number", "optional": true, "source": "§5/§7" },
+    "vitamin_b12": { "label": "Vitamin B12", "unit": "pg/mL", "type": "number", "optional": true, "source": "§5/§7" },
+    "calcium": { "label": "Calcium", "unit": "mg/dL", "type": "number", "optional": true, "source": "§5" },
+    "vitamin_d": { "label": "Vitamin D", "unit": "ng/mL", "type": "number", "optional": true, "source": "§5" },
+    "zinc": { "label": "Zinc", "unit": "µg/dL", "type": "number", "optional": true, "source": "§5" }
+  }
+}
