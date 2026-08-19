@@ -198,12 +198,13 @@ def compute_class_weights(loader: DataLoader, num_classes: int) -> torch.Tensor 
     return torch.tensor(weights, dtype=torch.float32)
 
 
-def train_one_epoch(model: nn.Module, loader: DataLoader, criterion: nn.Module, optimizer: optim.Optimizer) -> tuple[float, float]:
+def train_one_epoch(model: nn.Module, loader: DataLoader, criterion: nn.Module, optimizer: optim.Optimizer, device: torch.device) -> tuple[float, float]:
     model.train()
     total_loss = 0.0
     correct = 0
     total = 0
     for images, labels in loader:
+        images, labels = images.to(device), labels.to(device)
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
@@ -216,12 +217,13 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, criterion: nn.Module, 
 
 
 @torch.no_grad()
-def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module) -> tuple[float, float]:
+def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module, device: torch.device) -> tuple[float, float]:
     model.eval()
     total_loss = 0.0
     correct = 0
     total = 0
     for images, labels in loader:
+        images, labels = images.to(device), labels.to(device)
         outputs = model(images)
         loss = criterion(outputs, labels)
         total_loss += loss.item() * images.size(0)
@@ -244,11 +246,15 @@ def train(config: TrainConfig) -> Path:
     )
 
     model = build_model(config.backbone, config.num_classes, pretrained=True)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model = model.to(device)
+    LOGGER.info("Using device: %s", device)
 
     # Class weights for imbalanced datasets
     weight_tensor = None
     if config.class_weights == "balanced":
         weight_tensor = compute_class_weights(train_loader, config.num_classes)
+        weight_tensor = weight_tensor.to(device)
         LOGGER.info("Class weights: %s", weight_tensor.tolist())
     criterion = nn.CrossEntropyLoss(weight=weight_tensor)
 
@@ -282,8 +288,8 @@ def train(config: TrainConfig) -> Path:
         )
         scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=config.epochs - config.freeze_backbone_epochs)
 
-        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer)
-        val_loss, val_acc = evaluate(model, val_loader, criterion)
+        train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device)
+        val_loss, val_acc = evaluate(model, val_loader, criterion, device)
         elapsed = time.time() - t0
 
         LOGGER.info(
