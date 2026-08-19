@@ -8,6 +8,7 @@ dependencies = [
     "fastapi==0.116.1",
     "pillow>=11.0.0",
     "piper-tts>=1.7.0",
+    "python-multipart>=0.0.18",
     "rapidfuzz>=3.14.5",
     "sentence-transformers>=6.0.0",
     "torch>=2.11.0",

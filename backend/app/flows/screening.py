@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.config_loader import read_json_object
 from app.flows import model_registry
-from app.flows.vision_inference import predict_image
+from app.flows.vision_inference import predict_batch, predict_image
 from app.flows.growth_standards import assess_child_growth
 from app.settings import settings
 
@@ -575,9 +575,40 @@ async def screening_vision(test_id: str, population: str, request: Request) -> d
     if population not in ELIGIBLE_POPULATIONS:
         raise HTTPException(status_code=422, detail="Unsupported population")
     plan = build_plan(population, {}, {})
-    if not any(test["id"] == test_id for test in plan["visual_cues"]):
+    test_entry = next((t for t in plan["visual_cues"] if t["id"] == test_id), None)
+    if test_entry is None:
         raise HTTPException(status_code=404, detail="Test not applicable")
-    if not request.headers.get("content-type", "").startswith("image/"):
+
+    content_type = request.headers.get("content-type", "")
+    sub_captures = test_entry.get("sub_captures")
+
+    # Multi-image batch: when the test has sub_captures, the client MUST send multipart.
+    # We do NOT gate on content-type because dev proxies (Vite) may lose the boundary
+    # portion of the header.  If form parsing itself fails we still surface a useful error.
+    if sub_captures:
+        try:
+            form = await request.form()
+        except Exception as exc:
+            raise HTTPException(status_code=415, detail=f"Expected multipart/form-data for multi-site test: {exc}") from exc
+        images: list[bytes] = []
+        for capture in sub_captures:
+            upload = form.get(capture["id"])
+            if upload is None:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Missing image for {capture.get('label', capture['id'])}",
+                )
+            try:
+                images.append(await upload.read())
+            except Exception as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+        try:
+            return predict_batch(sub_captures, images)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # Single image
+    if not content_type.startswith("image/"):
         raise HTTPException(status_code=415, detail="Upload an image/jpeg or image/png body")
     try:
         return predict_image(test_id, await request.body())
@@ -585,6 +616,7 @@ async def screening_vision(test_id: str, population: str, request: Request) -> d
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
 
 
 @router.post("/test-result")

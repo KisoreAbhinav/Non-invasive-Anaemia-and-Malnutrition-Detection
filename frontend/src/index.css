@@ -152,11 +152,162 @@ h2, h3, p { overflow-wrap: anywhere; }
 .execution-card h2 { font-size: 1.8rem; }
 .execution-card p { margin: 8px 0 6px; color: var(--color-warning); font-weight: 800; }
 .execution-card small { color: var(--color-muted); line-height: 1.45; }
-.execution-card.camera-execution { padding: 10px 18px; grid-template-columns: 52px 1fr; gap: 6px 14px; align-content: start; }
+.execution-card.camera-execution { padding: 10px 14px; grid-template-columns: 52px 1fr; gap: 6px 12px; }
 .camera-execution .execution-mark { width: 44px; height: 44px; font-size: 1.2rem; }
-.camera-execution h2 { font-size: 1.2rem; }
-.camera-execution p { margin: 2px 0; font-size: 0.72rem; }
-.camera-execution small { font-size: 0.6rem; }
+.camera-execution h2 { font-size: 1.1rem; margin: 0; }
+.camera-execution small { color: var(--color-muted); font-size: 0.6rem; }
+/* ── Sub-capture wide canvas ── */
+.sub-capture-canvas {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: 1fr;
+  gap: 0;
+  height: 210px;
+  border: 1px solid var(--color-ink);
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.sub-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  background: #151512;
+  color: #ccc;
+  border-right: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.sub-slot:last-child {
+  border-right: none;
+}
+
+.sub-slot.active {
+  box-shadow: inset 0 0 0 2px var(--color-success);
+}
+
+.sub-slot.filled {
+  background: #0a0a09;
+}
+
+.sub-slot-body {
+  position: relative;
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sub-slot-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sub-slot-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sub-slot-retake-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  cursor: pointer;
+  font: 700 0.55rem Inter, sans-serif;
+  z-index: 3;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.sub-slot-retake-btn:hover {
+  background: rgba(0, 0, 0, 0.95);
+  border-color: #fff;
+}
+
+.sub-slot-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  color: rgba(255, 255, 255, 0.28);
+  height: 100%;
+}
+
+.sub-slot-empty-num {
+  font: 800 1.3rem ui-monospace, monospace;
+}
+
+.sub-slot-empty-text {
+  font: 600 0.55rem Inter, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.sub-slot-label-bar {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(15, 15, 13, 0.96);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 2;
+}
+
+.sub-slot-title {
+  font: 800 0.62rem ui-monospace, monospace;
+  color: #fff;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sub-slot-subtitle {
+  font: 500 0.55rem Inter, sans-serif;
+  color: #999;
+}
+
+.camera-controls-bar {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  display: flex;
+  justify-content: center;
+}
+
+.all-captured-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.all-captured-text {
+  color: var(--color-success);
+  font: 700 0.72rem Inter, sans-serif;
+}
+
+/* ── Single camera (non-sub_capture) ── */
 .camera-capture { grid-column: 1 / -1; display: grid; place-items: center; gap: 6px; }
 .camera-viewfinder { width: 100%; display: grid; gap: 6px; }
 .camera-video { width: 100%; max-height: 210px; border: 1px solid var(--color-ink); background: #000; border-radius: 3px; object-fit: contain; }
@@ -168,7 +319,12 @@ h2, h3, p { overflow-wrap: anywhere; }
 .camera-options { display: flex; gap: 10px; justify-content: center; align-items: center; min-height: 44px; }
 .camera-options .button { min-height: 38px; padding: 7px 14px; font-size: 0.72rem; }
 .camera-options kbd { margin-left: 4px; padding: 1px 3px; border: 1px solid currentColor; font: 700 0.5rem ui-monospace, monospace; }
+/* ── Vision results ── */
 .instant-result.vision-result { grid-template-columns: 1fr; gap: 6px; }
+.per-image-results { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.per-image-item { padding: 4px 6px; border: 1px solid var(--color-line); text-align: center; background: rgba(247,244,233,0.5); }
+.per-image-item strong { display: block; font: 700 0.55rem Inter, sans-serif; text-transform: uppercase; color: var(--color-muted); }
+.per-image-item span { font: 600 0.68rem Georgia, serif; }
 .vision-scores { display: grid; gap: 3px; padding: 4px 0; }
 .score-bar { display: grid; grid-template-columns: 90px 1fr 55px; align-items: center; gap: 6px; }
 .score-label { font: 700 0.6rem Inter, sans-serif; text-transform: uppercase; }

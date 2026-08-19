@@ -115,11 +115,15 @@ function App() {
   const [testInputs, setTestInputs] = useState({});
   const [currentTestResult, setCurrentTestResult] = useState(null);
   const [activeClinicalIndex, setActiveClinicalIndex] = useState(0);
-  const [capturedImage, setCapturedImage] = useState(null);
-  const [capturedImageUrl, setCapturedImageUrl] = useState(null);
+  const [capturedImages, setCapturedImages] = useState([]);  // array of Blobs for sub_captures
+  const [capturedPreviewUrls, setCapturedPreviewUrls] = useState([]);
+  const [activeSlot, setActiveSlot] = useState(0);  // which sub_capture slot is active
   const cameraStreamRef = useRef(null);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
+  // Kept for non-sub_capture tests (single image)
+  const [capturedImage, setCapturedImage] = useState(null);
+  const [capturedImageUrl, setCapturedImageUrl] = useState(null);
 
   const sessionRef = useRef(null);
   const captureRef = useRef(null);
@@ -143,50 +147,148 @@ function App() {
     if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
-  const setCapturedAndPreview = useCallback((blob) => {
-    if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl);
-    setCapturedImage(blob);
-    setCapturedImageUrl(URL.createObjectURL(blob));
-  }, [capturedImageUrl]);
+  const attachVideoStream = useCallback((node) => {
+    videoRef.current = node;
+    if (node) {
+      node.defaultMuted = true;
+      node.muted = true;
+      node.playsInline = true;
+      node.setAttribute("playsinline", "true");
+      node.setAttribute("muted", "true");
+      node.setAttribute("autoplay", "true");
+      const stream = cameraStreamRef.current;
+      if (stream) {
+        if (node.srcObject !== stream) {
+          node.srcObject = stream;
+        }
+        const playPromise = node.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(() => {
+            node.onloadeddata = () => { node.play().catch(() => {}); };
+          });
+        }
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (videoRef.current && cameraStreamRef.current) {
+      const node = videoRef.current;
+      node.defaultMuted = true;
+      node.muted = true;
+      node.playsInline = true;
+      if (node.srcObject !== cameraStreamRef.current) {
+        node.srcObject = cameraStreamRef.current;
+      }
+      const playPromise = node.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(() => {
+          node.onloadeddata = () => { node.play().catch(() => {}); };
+        });
+      }
+    }
+  }, [activeSlot]);
 
   const startCamera = useCallback(async () => {
-    closeCamera();
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-      cameraStreamRef.current = stream;
-      requestAnimationFrame(() => {
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      });
+      let stream = cameraStreamRef.current;
+      if (!stream || !stream.active) {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          audio: false,
+        });
+        cameraStreamRef.current = stream;
+      }
+      if (videoRef.current && videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
     } catch {
       setError("Camera unavailable. Use file upload instead.");
     }
-  }, [closeCamera]);
+  }, []);
 
-  const capturePhoto = useCallback(() => {
+  // Capture photo into a specific slot (for sub_captures) or single mode
+  const captureToSlot = useCallback((slotIndex, closeAfter = false) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas) return;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    // Crop to square from center
+    const vw = video.videoWidth || 640;
+    const vh = video.videoHeight || 480;
+    const size = Math.min(vw, vh);
+    const sx = (vw - size) / 2;
+    const sy = (vh - size) / 2;
+    canvas.width = size;
+    canvas.height = size;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0);
+    if (!ctx) return;
+    ctx.drawImage(video, sx, sy, size, size, 0, 0, size, size);
     canvas.toBlob((blob) => {
-      if (blob) {
-        closeCamera();
-        setCapturedAndPreview(blob);
+      if (!blob) return;
+      if (closeAfter) closeCamera();
+      // Multi-slot mode
+      if (slotIndex !== null && slotIndex !== undefined) {
+        setCapturedImages((prev) => {
+          const next = [...prev];
+          next[slotIndex] = blob;
+          return next;
+        });
+        setCapturedPreviewUrls((prev) => {
+          if (prev[slotIndex]) URL.revokeObjectURL(prev[slotIndex]);
+          const next = [...prev];
+          next[slotIndex] = URL.createObjectURL(blob);
+          return next;
+        });
+        setActiveSlot(slotIndex + 1);
+      } else {
+        // Single image mode
+        if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl);
+        setCapturedImage(blob);
+        setCapturedImageUrl(URL.createObjectURL(blob));
       }
-    }, "image/jpeg", 0.92);
-  }, [closeCamera, setCapturedAndPreview]);
+    }, "image/jpeg", 0.95);
+  }, [closeCamera, capturedImageUrl]);
+
+  const capturePhoto = useCallback(() => captureToSlot(null, true), [captureToSlot]);
+
+  const handleFileUploadToSlot = useCallback((slotIndex, event) => {
+    const file = event.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+    setCapturedImages((prev) => {
+      const next = [...prev];
+      next[slotIndex] = file;
+      return next;
+    });
+    setCapturedPreviewUrls((prev) => {
+      if (prev[slotIndex]) URL.revokeObjectURL(prev[slotIndex]);
+      const next = [...prev];
+      next[slotIndex] = URL.createObjectURL(file);
+      return next;
+    });
+    setActiveSlot(slotIndex + 1);
+  }, []);
 
   const handleFileUpload = useCallback((event) => {
     const file = event.target.files?.[0];
     if (file && file.type.startsWith("image/")) {
       closeCamera();
-      setCapturedAndPreview(file);
+      if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl);
+      setCapturedImage(file);
+      setCapturedImageUrl(URL.createObjectURL(file));
     }
-  }, [closeCamera, setCapturedAndPreview]);
+  }, [closeCamera, capturedImageUrl]);
+
+  const clearSlot = useCallback((slotIndex) => {
+    setCapturedImages((prev) => { const n = [...prev]; n[slotIndex] = null; return n; });
+    setCapturedPreviewUrls((prev) => { if (prev[slotIndex]) URL.revokeObjectURL(prev[slotIndex]); const n = [...prev]; n[slotIndex] = null; return n; });
+  }, []);
+
+  const retakeSlot = useCallback((slotIndex) => {
+    clearSlot(slotIndex);
+    setActiveSlot(slotIndex);
+    void startCamera();
+  }, [clearSlot, startCamera]);
 
   const stopPlayback = useCallback(() => {
     audioRef.current?.pause();
@@ -488,18 +590,32 @@ function App() {
     void playQuestion();
   }, [busy, playQuestion, session?.question?.id, stage]);
 
+  const capturedPreviewUrlsRef = useRef([]);
+  useEffect(() => {
+    capturedPreviewUrlsRef.current = capturedPreviewUrls;
+  }, [capturedPreviewUrls]);
+
+  const capturedImageUrlRef = useRef(null);
+  useEffect(() => {
+    capturedImageUrlRef.current = capturedImageUrl;
+  }, [capturedImageUrl]);
+
+  useEffect(() => () => {
+    closeCapture(); stopPlayback(); closeCamera();
+    capturedPreviewUrlsRef.current.forEach((u) => { if (u) URL.revokeObjectURL(u); });
+    if (capturedImageUrlRef.current) URL.revokeObjectURL(capturedImageUrlRef.current);
+  }, [closeCapture, stopPlayback, closeCamera]);
+
   const usePhysicalInput = useCallback(() => {
     if (stage !== "questionnaire") return;
     closeCapture(); setInputMode("physical"); setNotice("Physical input active for this question.");
   }, [closeCapture, stage]);
 
-  useEffect(() => () => {
-    closeCapture(); stopPlayback(); closeCamera();
-    if (capturedImageUrl) URL.revokeObjectURL(capturedImageUrl);
-  }, [closeCapture, stopPlayback, closeCamera, capturedImageUrl]);
 
   const resetToIdle = () => {
     closeCapture(); stopPlayback(); closeCamera();
+    capturedPreviewUrls.forEach((u) => { if (u) URL.revokeObjectURL(u); });
+    setCapturedImages([]); setCapturedPreviewUrls([]); setActiveSlot(0);
     if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
     setCapturedImage(null);
     setStage("idle"); setSession(null); setPlan(null);
@@ -580,32 +696,59 @@ function App() {
   const moveToNextTest = () => {
     setCurrentTestResult(null);
     closeCamera();
+    // Clean up all capture state
+    capturedPreviewUrls.forEach((u) => { if (u) URL.revokeObjectURL(u); });
+    setCapturedImages([]); setCapturedPreviewUrls([]); setActiveSlot(0);
     if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
     setCapturedImage(null);
     if (testIndex + 1 < plan.visual_cues.length) setTestIndex((index) => index + 1);
     else { setActiveClinicalIndex(0); setStage("clinical"); }
   };
 
-  // Attach camera stream to video element when it appears
+  // Attach camera stream to video element whenever either changes
   useEffect(() => {
     const stream = cameraStreamRef.current;
     const video = videoRef.current;
-    if (stream && video && !video.srcObject) {
-      video.srcObject = stream;
+    if (stream && video) {
+      video.defaultMuted = true;
+      video.muted = true;
+      video.playsInline = true;
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+      }
+      const p = video.play();
+      if (p !== undefined) {
+        p.catch(() => {
+          video.onloadeddata = () => { video.play().catch(() => {}); };
+        });
+      }
     }
   });
 
-  const submitVisionTest = useCallback(async (test, imageBlob) => {
+  const submitVisionTest = useCallback(async (test, images) => {
+    // images is either a single Blob or an array of Blobs (for sub_captures)
     setBusy(true); setError("");
     try {
-      const response = await fetch(
-        `/api/flows/screening/vision/${test.id}?population=${session.result.population}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "image/jpeg" },
-          body: imageBlob,
-        },
-      );
+      let response;
+      const subCaptures = test.sub_captures;
+      if (subCaptures && Array.isArray(images) && images.length > 0) {
+        // Multi-image: send as multipart form-data
+        const formData = new FormData();
+        subCaptures.forEach((cap, idx) => {
+          if (images[idx]) formData.append(cap.id, images[idx], `${cap.id}.jpg`);
+        });
+        response = await fetch(
+          `/api/flows/screening/vision/${test.id}?population=${session.result.population}`,
+          { method: "POST", body: formData },
+        );
+      } else {
+        // Single image
+        const blob = Array.isArray(images) ? images[0] : images;
+        response = await fetch(
+          `/api/flows/screening/vision/${test.id}?population=${session.result.population}`,
+          { method: "POST", headers: { "Content-Type": "image/jpeg" }, body: blob },
+        );
+      }
       const result = await readApiResponse(response);
       const displayResult = {
         classification: result.classification,
@@ -614,14 +757,14 @@ function App() {
         spoken_text: `${test.name}. Classification: ${result.classification}. Confidence: ${(result.confidence * 100).toFixed(1)} percent.`,
         vision_scores: result.scores,
         vision_primary: result.primary_score,
+        per_image: result.per_image,
       };
-      // Store the vision result in visualResults for final fusion
       setVisualResults((items) => [
         ...items.filter((item) => item.test_id !== test.id),
         {
           test_id: test.id,
           value: { scores: result.scores },
-          confidence: result.primary_score,
+          score: result.primary_score,
           status: "complete",
         },
       ]);
@@ -662,8 +805,14 @@ function App() {
         return;
       }
     }
-    if (!skip && camera && !capturedImage) {
-      setError("Capture or upload an image before continuing.");
+    const hasSubCaptures = !!(test.sub_captures?.length);
+    const subCount = hasSubCaptures ? test.sub_captures.length : 0;
+    const filledSlots = hasSubCaptures ? capturedImages.filter(Boolean).length : 0;
+    const allFilled = hasSubCaptures ? filledSlots === subCount : !!capturedImage;
+    if (!skip && camera && !allFilled) {
+      setError(hasSubCaptures
+        ? `Capture all ${subCount} images (${filledSlots}/${subCount} done).`
+        : "Capture or upload an image before continuing.");
       return;
     }
     setError("");
@@ -676,8 +825,13 @@ function App() {
     setVisualResults((items) => [...items.filter((item) => item.test_id !== test.id), recorded]);
     if (skip) {
       closeCamera();
-      if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
-      setCapturedImage(null);
+      if (hasSubCaptures) {
+        capturedPreviewUrls.forEach((u) => { if (u) URL.revokeObjectURL(u); });
+        setCapturedImages([]); setCapturedPreviewUrls([]); setActiveSlot(0);
+      } else {
+        if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+        setCapturedImage(null);
+      }
       moveToNextTest();
       return;
     }
@@ -700,8 +854,9 @@ function App() {
       } finally { setBusy(false); }
       return;
     }
-    if (camera && capturedImage) {
-      await submitVisionTest(test, capturedImage);
+    if (camera && allFilled) {
+      const images = hasSubCaptures ? capturedImages : capturedImage;
+      await submitVisionTest(test, images);
       return;
     }
     // No model installed fallback
@@ -754,6 +909,14 @@ function App() {
 
   useEffect(() => {
     if (stage !== "tests" || currentTestResult) return;
+    const test = plan?.visual_cues?.[testIndex];
+    const isCamera = test && !test.execution_type && test.availability.available;
+    if (isCamera) {
+      // Auto-open camera when entering a camera test
+      const t = window.setTimeout(() => startCamera(), 200);
+      return () => { window.clearTimeout(t); closeCamera(); };
+    }
+    // Physical tests: focus first field
     const frame = window.requestAnimationFrame(() => {
       document.querySelector("[data-test-field]")?.focus();
     });
@@ -925,19 +1088,47 @@ function App() {
       if (stage === "tests" && !currentTestResult && !isInput) {
         const test = plan?.visual_cues?.[testIndex];
         const camera = test && !test.execution_type && test.availability.available;
-        if (camera && !capturedImage && event.key === "c") {
-          event.preventDefault(); startCamera(); return;
+        const hasSub = !!(test?.sub_captures?.length);
+        if (camera && event.key === "c") {
+          event.preventDefault();
+          if (hasSub) {
+            const nextSlot = capturedImages.findIndex((img) => !img);
+            if (nextSlot >= 0) { setActiveSlot(nextSlot); void startCamera(); }
+            else { setActiveSlot(0); void startCamera(); }
+          } else if (!capturedImage) { void startCamera(); }
+          return;
         }
-        if (camera && !capturedImage && event.key === "u") {
-          event.preventDefault(); document.getElementById("vision-file-input")?.click(); return;
+        if (camera && event.key === "u") {
+          event.preventDefault();
+          document.getElementById("vision-file-input")?.click();
+          return;
         }
         if (camera && cameraStreamRef.current && event.code === "Space") {
-          event.preventDefault(); capturePhoto(); return;
-        }
-        if (camera && capturedImage && event.key === "r") {
           event.preventDefault();
-          if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
-          setCapturedImage(null);
+          if (hasSub) {
+            const subCount = test.sub_captures?.length ?? 3;
+            const targetSlot = (activeSlot < subCount && !capturedImages[activeSlot])
+              ? activeSlot
+              : capturedImages.findIndex((img) => !img);
+            if (targetSlot >= 0) {
+              captureToSlot(targetSlot, false);
+            }
+          } else {
+            capturePhoto();
+          }
+          return;
+        }
+        if (camera && event.key === "r") {
+          event.preventDefault();
+          if (hasSub) {
+            const lastFilled = capturedImages.map((img, i) => img ? i : -1).filter((i) => i >= 0).pop();
+            const target = (activeSlot < 3 && capturedImages[activeSlot]) ? activeSlot : (lastFilled !== undefined ? lastFilled : 0);
+            retakeSlot(target);
+          } else if (capturedImage) {
+            if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
+            setCapturedImage(null);
+            void startCamera();
+          }
           return;
         }
       }
@@ -1088,9 +1279,11 @@ function App() {
   const renderTest = () => {
     const test = plan?.visual_cues?.[testIndex];
     if (!test) return null;
-    const available = test.availability.available;
     const physical = test.execution_type === "physical";
-    const camera = !physical && available;
+    const camera = !physical && test.availability.available;
+    const hasSub = !!(test.sub_captures?.length);
+    const subCaps = test.sub_captures ?? [];
+    const filled = capturedImages.filter(Boolean).length;
     const values = testInputs[test.id] ?? {};
     const muacValue = Number(values.muac_cm);
     const muacDomain = session.result.population === "child_under5" ? [8, 18]
@@ -1098,84 +1291,170 @@ function App() {
     const muacPosition = Number.isFinite(muacValue)
       ? Math.max(0, Math.min(100, ((muacValue - muacDomain[0]) / (muacDomain[1] - muacDomain[0])) * 100))
       : 0;
+
     return (
       <section className="content execution-screen">
         <p className="eyebrow">Test {testIndex + 1} of {plan.visual_cues.length} · {test.category} · Enter: next/classify · Esc: skip</p>
-        <div className={`execution-card ${physical ? "physical-execution" : camera ? "camera-execution" : ""}`}>
-          <span className={`execution-mark ${physical ? "" : available ? "ready" : "missing"}`}>{physical ? "⌨" : available ? "◉" : "—"}</span>
-          <div><h2>{test.name}</h2><p>{physical ? "Enter the measured values" : available ? "Capture or upload an image" : "No model installed — test skipped"}</p><small>{test.description}</small></div>
+        <div className={`execution-card ${physical ? "physical-execution" : "camera-execution"}`}>
+          <span className="execution-mark">{physical ? "⌨" : "◉"}</span>
+          <div><h2>{test.name}</h2><small>{test.description}</small></div>
+
+          {/* ── Physical inputs ── */}
           {physical && !currentTestResult && (
             <div className="measurement-grid">
               {(test.input_fields ?? []).map((field) => (
                 <label key={field.id}>
                   <span>{field.label}{field.unit ? ` (${field.unit})` : ""}</span>
                   {field.type === "select" ? (
-                    <select data-test-field={field.id} value={values[field.id] ?? ""} onChange={(event) => setTestInputs((all) => ({
-                      ...all, [test.id]: { ...(all[test.id] ?? {}), [field.id]: event.target.value },
+                    <select data-test-field={field.id} value={values[field.id] ?? ""} onChange={(e) => setTestInputs((a) => ({
+                      ...a, [test.id]: { ...(a[test.id] ?? {}), [field.id]: e.target.value },
                     }))}>
                       <option value="">Choose…</option>
-                      {(field.options ?? []).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                      {(field.options ?? []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   ) : (
                     <input data-test-field={field.id} type="number" min={field.min} max={field.max} step="any" value={values[field.id] ?? ""}
-                      onChange={(event) => setTestInputs((all) => ({
-                      ...all, [test.id]: { ...(all[test.id] ?? {}), [field.id]: event.target.value },
+                      onChange={(e) => setTestInputs((a) => ({
+                      ...a, [test.id]: { ...(a[test.id] ?? {}), [field.id]: e.target.value },
                     }))} />
                   )}
                 </label>
               ))}
             </div>
           )}
-          {camera && !currentTestResult && (
+
+          {/* ── Camera: 3-slot wide-canvas preview layout ── */}
+          {camera && hasSub && !currentTestResult && (
+            <>
+              <div className="sub-capture-canvas" role="region" aria-label="3 camera previews for multi-site inspection">
+                {subCaps.map((cap, idx) => {
+                  const isFilled = !!capturedImages[idx];
+                  const isActive = idx === activeSlot && !isFilled;
+                  const isPending = !isFilled && !isActive;
+                  return (
+                    <div
+                      key={cap.id}
+                      className={`sub-slot ${isFilled ? "filled" : ""} ${isActive ? "active" : ""} ${isPending ? "pending" : ""}`}
+                      onClick={() => {
+                        if (isFilled) {
+                          retakeSlot(idx);
+                        } else if (!isActive) {
+                          setActiveSlot(idx);
+                          void startCamera();
+                        }
+                      }}
+                    >
+                      <div className="sub-slot-body">
+                        {isFilled ? (
+                          <>
+                            <img src={capturedPreviewUrls[idx]} alt={cap.label} className="sub-slot-image" />
+                            <button
+                              className="sub-slot-retake-btn"
+                              type="button"
+                              title="Retake image"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                retakeSlot(idx);
+                              }}
+                            >
+                              ↻ Retake
+                            </button>
+                          </>
+                        ) : isActive ? (
+                          <video
+                            key={`active-video-${idx}`}
+                            ref={attachVideoStream}
+                            autoPlay
+                            playsInline
+                            muted
+                            className="sub-slot-video"
+                          />
+                        ) : (
+                          <div className="sub-slot-empty">
+                            <span className="sub-slot-empty-num">0{idx + 1}</span>
+                            <span className="sub-slot-empty-text">Pending</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="sub-slot-label-bar">
+                        <span className="sub-slot-title">{idx + 1}. {cap.label}</span>
+                        <span className="sub-slot-subtitle">
+                          {idx === 0 ? "Eye (Conjunctiva)" : idx === 1 ? "Nail Bed" : "Palm Surface"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <canvas ref={canvasRef} style={{ display: "none" }} />
+              <div className="camera-controls-bar">
+                {activeSlot < subCaps.length ? (
+                  <div className="camera-actions">
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={() => captureToSlot(activeSlot, false)}
+                      disabled={busy}
+                    >
+                      Capture {subCaps[activeSlot]?.label} <kbd>Space</kbd>
+                    </button>
+                    {filled > 0 && (
+                      <button
+                        className="button quiet"
+                        type="button"
+                        onClick={() => retakeSlot(activeSlot > 0 ? activeSlot - 1 : 0)}
+                      >
+                        Retake previous <kbd>R</kbd>
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="camera-actions all-captured-notice">
+                    <span className="all-captured-text">✓ All 3 body sites captured</span>
+                    <button
+                      className="button quiet"
+                      type="button"
+                      onClick={() => {
+                        capturedPreviewUrls.forEach((u) => { if (u) URL.revokeObjectURL(u); });
+                        setCapturedImages([]);
+                        setCapturedPreviewUrls([]);
+                        setActiveSlot(0);
+                        void startCamera();
+                      }}
+                    >
+                      Retake all
+                    </button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ── Camera: single image ── */}
+          {camera && !hasSub && !currentTestResult && (
             <div className="camera-capture">
-              {cameraStreamRef.current ? (
-                <div className="camera-viewfinder">
-                  <video ref={videoRef} autoPlay playsInline muted className="camera-video" />
-                  <canvas ref={canvasRef} style={{ display: "none" }} />
-                  <div className="camera-actions">
-                    <button className="button primary" type="button" onClick={capturePhoto} disabled={busy}>
-                      Capture <kbd>Space</kbd>
-                    </button>
-                    <button className="button quiet" type="button" onClick={() => { closeCamera(); }}>
-                      Cancel <kbd>Esc</kbd>
-                    </button>
-                  </div>
+              <div className="camera-viewfinder">
+                <video ref={attachVideoStream} autoPlay playsInline muted className="camera-video" />
+                <canvas ref={canvasRef} style={{ display: "none" }} />
+                <div className="camera-actions">
+                  <button className="button primary" type="button" onClick={capturePhoto} disabled={busy}>Capture <kbd>Space</kbd></button>
+                  <button className="button quiet" type="button" onClick={() => { closeCamera(); }}>Cancel <kbd>Esc</kbd></button>
                 </div>
-              ) : capturedImage ? (
-                <div className="captured-preview">
-                  <img src={capturedImageUrl} alt="Captured" className="camera-preview-img" />
-                  <div className="camera-actions">
-                    <button className="button quiet" type="button" onClick={() => {
-                      if (capturedImageUrl) { URL.revokeObjectURL(capturedImageUrl); setCapturedImageUrl(null); }
-                      setCapturedImage(null);
-                    }}>Retake <kbd>R</kbd></button>
-                  </div>
-                </div>
-              ) : (
-                <div className="camera-options">
-                  <button className="button primary" type="button" onClick={startCamera} disabled={busy}>
-                    Open camera <kbd>C</kbd>
-                  </button>
-                  <label className="button quiet" style={{ cursor: "pointer" }}>
-                    Upload image <kbd>U</kbd>
-                    <input id="vision-file-input" type="file" accept="image/*" capture="environment" onChange={handleFileUpload} style={{ display: "none" }} />
-                  </label>
-                </div>
-              )}
+              </div>
             </div>
           )}
+
+          {/* ── Results ── */}
           {currentTestResult && (
-            <div className={`instant-result ${currentTestResult.vision_scores ? "vision-result" : ""}`} aria-live="polite">
-              {test.id === "muac" && (
-                <div className="muac-visual" role="img" aria-label={`MUAC marker at ${muacValue} centimetres`}>
-                  <div className="muac-tape"><span className="danger-zone"/><span className="warning-zone"/><span className="safe-zone"/>
-                    <i style={{ left: `${muacPosition}%` }}><b>{muacValue} cm</b></i>
-                  </div>
-                </div>
-              )}
-              {test.id === "weight_height_z" && (
-                <div className="z-score-visual">
-                  {String(currentTestResult.display).split(" · ").map((metric) => <span key={metric}>{metric}</span>)}
+            <div className="instant-result" aria-live="polite">
+              {currentTestResult.per_image && (
+                <div className="per-image-results">
+                  {currentTestResult.per_image.map((r) => (
+                    <div key={r.label} className="per-image-item">
+                      <strong>{r.label}</strong>
+                      <span>{r.classification} ({(r.primary_score * 100).toFixed(0)}%)</span>
+                    </div>
+                  ))}
                 </div>
               )}
               {currentTestResult.vision_scores && (
@@ -1189,7 +1468,7 @@ function App() {
                   ))}
                 </div>
               )}
-              {!(["muac", "weight_height_z"].includes(test.id)) && !currentTestResult.vision_scores && (
+              {!currentTestResult.vision_scores && !currentTestResult.per_image && (
                 <div className="classification-scan" aria-hidden="true"><span/><b>Measurement classified</b></div>
               )}
               <div><strong>{currentTestResult.classification}</strong><p>{currentTestResult.display}</p><small>{currentTestResult.threshold}</small></div>
@@ -1198,7 +1477,7 @@ function App() {
         </div>
         <ActionBar onSkip={() => advanceTest(true)} skipLabel="Skip this test">
           <button className="button primary" type="button" onClick={() => void advanceTest(false)} disabled={busy}>
-            {currentTestResult ? "Next test" : physical ? "Classify measurement" : camera ? "Run inference" : "Handle test"} →
+            {currentTestResult ? "Next test" : physical ? "Classify" : camera ? "Run inference" : "Handle"} →
           </button>
         </ActionBar>
       </section>

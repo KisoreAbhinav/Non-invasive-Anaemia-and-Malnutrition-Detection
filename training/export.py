@@ -31,12 +31,12 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_OUTPUT_ROOT = SCRIPT_DIR.parent / "backend" / "models" / "vision"
 
 PREPROCESSING = {
-    "color_space": "RGB",
+    "color_space": "Lab",
     "resize": [256, 256],
     "center_crop": 224,
     "scale": [0.0, 1.0],
-    "mean": [0.485, 0.456, 0.406],
-    "std": [0.229, 0.224, 0.225],
+    "mean": [0.5, 0.5, 0.5],
+    "std": [0.5, 0.25, 0.25],
 }
 
 

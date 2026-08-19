@@ -37,9 +37,23 @@ PREPROCESSING = {
 
 MODELS: list[dict] = [
     {
-        "test_id": "pallor",
+        "test_id": "pallor_eye",
         "backbone": "mobilenet_v3_small",
-        "description": "Conjunctival, nail, palm & tongue pallor classifier (anemia risk)",
+        "description": "Conjunctival pallor classifier (anemia risk from inner eyelid)",
+        "class_labels": ["normal", "risk"],
+        "primary_score_key": "risk",
+    },
+    {
+        "test_id": "pallor_nail",
+        "backbone": "mobilenet_v3_small",
+        "description": "Nail bed pallor classifier (anemia risk from fingernail colour)",
+        "class_labels": ["normal", "risk"],
+        "primary_score_key": "risk",
+    },
+    {
+        "test_id": "pallor_palm",
+        "backbone": "mobilenet_v3_small",
+        "description": "Palm pallor classifier (anemia risk from palm colour)",
         "class_labels": ["normal", "risk"],
         "primary_score_key": "risk",
     },

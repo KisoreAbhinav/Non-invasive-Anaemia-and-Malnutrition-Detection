@@ -30,9 +30,7 @@ backend/.local-uv-python/
 
 .DS_Store
 
-pallor_eye/*/
-pallor_palm/*/
-pallor_fingernail/*/
+data/
 
 # Training artifacts
 training/logs/
