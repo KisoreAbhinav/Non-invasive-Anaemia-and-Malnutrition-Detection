@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">Dinnerbone</title>
+  <rect width="64" height="64" rx="12" fill="#292925"/>
+  <path d="M17 15h30v8h-4v8H21v-8h-4zm5 20h20l5 14H17z" fill="#f2efe4"/>
+  <path d="M25 15v8m14-8v8" stroke="#292925" stroke-width="3"/>
+</svg>

@@ -1,0 +1,14 @@
+__pycache__/
+.pytest_cache/
+.venv/
+.local-uv-cache/
+.local-uv-python/
+*.pyc
+
+models/vosk/*
+!models/vosk/.gitkeep
+models/piper/*.onnx*
+!models/piper/.gitkeep
+models/sentence-transformers/
+models/vision/*/*
+!models/vision/*/.gitkeep
