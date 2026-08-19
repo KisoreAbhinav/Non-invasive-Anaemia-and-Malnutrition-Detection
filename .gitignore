@@ -29,3 +29,11 @@ backend/.local-uv-cache/
 backend/.local-uv-python/
 
 .DS_Store
+
+pallor_eye/*/
+pallor_palm/*/
+pallor_fingernail/*/
+
+# Training artifacts
+training/logs/
+training/checkpoints/*/
