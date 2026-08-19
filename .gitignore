@@ -1,0 +1,31 @@
+__pycache__/
+.pytest_cache/
+.venv/
+*.pyc
+*.ses
+.env
+!.env.example
+**/.git/
+
+node_modules/
+dist/
+
+# Runtime speech models are downloaded/placed locally, never committed.
+backend/models/vosk/*
+!backend/models/vosk/.gitkeep
+backend/models/piper/*
+!backend/models/piper/.gitkeep
+backend/models/sentence-transformers/
+backend/models/vision/*/*
+!backend/models/vision/*/.gitkeep
+*.onnx
+*.onnx.json
+*.pt
+*.pth
+*.tflite
+
+# Project-local uv state used when home-directory writes are unavailable.
+backend/.local-uv-cache/
+backend/.local-uv-python/
+
+.DS_Store
