@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#eeeade">
+  <title>Dinnerbone</title>
+  <link rel="icon" href="/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css?v=20260817a">
+</head>
+<body>
+  <div id="siteIntro" class="site-intro" aria-hidden="true">
+    <div class="intro-board" aria-hidden="true"></div>
+    <div class="intro-vignette"></div>
+    <div class="intro-title-lockup">
+      <span class="intro-title-line intro-dinner">Dinner</span>
+      <span class="intro-title-line intro-bone">Bone</span>
+      <span class="intro-knight">♞</span>
+    </div>
+  </div>
+  <header class="masthead">
+    <a class="brand-block" href="/" aria-label="Dinnerbone home"><img src="/logo.svg" alt=""><h1>Dinnerbone</h1></a>
+    <div class="position-status" aria-live="polite">
+      <span id="modeBadge" class="status-chip">ANALYSIS</span>
+      <span id="turnBadge" class="status-chip">WHITE TO MOVE</span>
+      <span id="searchBadge" class="status-chip muted">CONNECTING</span>
+    </div>
+    <div class="masthead-actions"><button id="accountButton" class="button quiet" type="button">Sign in</button><button id="inviteButton" class="button quiet" type="button">Invite a player</button><button id="setupButton" class="button primary" type="button">New session</button></div>
+  </header>
+
+  <main class="workspace">
+    <section class="panel move-panel" aria-labelledby="movesTitle">
+      <section class="moves-section" aria-labelledby="movesTitle">
+        <div class="panel-heading"><div><span class="section-number">01</span><h2 id="movesTitle">MOVES</h2></div><button id="undoButton" class="icon-button" type="button" title="Undo last move">↶</button></div>
+        <div class="move-head"><span></span><span>WHITE</span><span>BLACK</span></div>
+        <div id="moveList" class="move-list"><p class="empty-copy">The score sheet is empty.</p></div>
+        <div class="fen-readout"><span>POSITION</span><button id="copyFenButton" class="fen-value" type="button" title="Copy FEN">Starting position</button></div>
+      </section>
+      <section class="embedded-engine" aria-labelledby="engineTitle">
+        <div class="panel-heading"><div><span class="section-number">02</span><h2 id="engineTitle">ENGINE LINES</h2></div><span id="sourceBadge" class="micro-badge">TREE</span></div>
+        <div id="engineMetrics" class="metrics-grid"></div>
+        <div id="lineList" class="line-list"><p class="empty-copy">Warming the search tree…</p></div>
+      </section>
+    </section>
+
+    <section class="board-column" aria-labelledby="boardTitle">
+      <div class="board-heading">
+        <div><span class="section-number">03</span><h2 id="boardTitle">BOARD</h2></div>
+        <div class="board-status-actions"><span id="boardThinking" class="board-thinking" hidden></span><button id="engineMoveButton" class="button primary" type="button">Play candidate</button></div>
+      </div>
+      <div id="matchPlayers" class="match-players" hidden>
+        <p class="match-clock-label">MATCH CLOCKS</p>
+        <div id="blackPlayer" class="match-player"><span><i></i><b id="blackPlayerName">TIME FOR BLACK</b></span><strong id="blackClock">10:00</strong></div>
+        <div id="blackPocket" class="piece-pocket" hidden></div>
+        <div id="whitePlayer" class="match-player"><span><i></i><b id="whitePlayerName">TIME FOR WHITE</b></span><strong id="whiteClock">10:00</strong></div>
+        <div id="whitePocket" class="piece-pocket" hidden></div>
+      </div>
+      <div class="board-stage">
+        <div class="eval-track" title="White-relative evaluation"><div id="evalFill" class="eval-fill"></div><span id="evalLabel" class="eval-label">0.00</span></div>
+        <div id="board" class="chessboard" role="grid" aria-label="Chessboard"></div>
+      </div>
+      <div class="board-lower"><div class="interaction-hint">Drag a piece, or select its starting and destination squares.</div><div class="board-actions"><button id="saveButton" class="button quiet" type="button">Save</button><button id="drawButton" class="button quiet match-action" type="button" hidden>Offer draw</button><button id="resignButton" class="button quiet match-action" type="button" hidden>Resign</button><button id="rematchButton" class="button primary match-action" type="button" hidden>Rematch</button><button id="flipButton" class="button quiet" type="button">Flip</button><button id="newButton" class="button quiet" type="button">Reset</button></div></div>
+      <div id="premoveBar" class="premove-bar" hidden><span>Premove ready: <b id="premoveText"></b></span><button id="cancelPremoveButton" class="text-button" type="button">Cancel</button></div>
+      <div id="matchOfferBar" class="match-offer-bar" hidden><span id="matchOfferText"></span><div><button id="declineOfferButton" class="text-button" type="button">Decline</button><button id="acceptOfferButton" class="text-button strong" type="button">Accept</button></div></div>
+      <p id="statusMessage" class="visually-hidden" aria-live="polite">Connecting to Dinnerbone…</p>
+    </section>
+
+    <aside class="insight-column">
+      <section class="panel coach-panel" aria-labelledby="coachTitle">
+        <div class="panel-heading"><div><span class="section-number">04</span><h2 id="coachTitle">LEARNER'S GUIDE</h2></div></div>
+        <p id="guideSummary" class="guide-summary">Reading the position…</p>
+        <div class="coach-block"><h3>IDEAS FOR WHITE</h3><div id="lineIdeaGuide" class="coach-copy"></div></div>
+        <div class="coach-block"><h3>LAST ENGINE MOVE</h3><div id="currentMoveGuide" class="coach-copy"></div></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="footer"><span id="connectionState"><i></i> Connecting</span><span id="footerAbout">Dinnerbone is classical Python · Stockfish and LC0 are optional external engines</span></footer>
+
+  <dialog id="setupDialog" class="dialog">
+    <form id="setupForm">
+      <div class="dialog-heading"><div><span class="section-number">SESSION</span><h2>Start Dinnerbone</h2></div><button id="setupCloseButton" class="icon-button" type="button" aria-label="Close">×</button></div>
+      <div id="sessionChoices" class="session-choices">
+        <button type="button" data-session="invite"><b>Invite a player</b><span>Create a private one-match guest link with variants and clocks.</span></button>
+        <button type="button" data-session="white"><b>Play as White</b><span>You move first against full Dinnerbone.</span></button>
+        <button type="button" data-session="black"><b>Play as Black</b><span>Dinnerbone opens instantly from its book.</span></button>
+        <button type="button" data-session="load"><b>Load a position</b><span>Paste a FEN and analyze either side.</span></button>
+        <button type="button" data-session="personality"><b>Personality match</b><span>Shape Dinnerbone's strength, temperament, and positional preferences.</span></button>
+        <button type="button" data-session="elo"><b>Estimated Elo match</b><span>Choose an approximate 800–2800 strength.</span></button>
+        <button type="button" data-session="engine"><b>Choose another engine</b><span>Play Stockfish, LC0, or Dinnerbone at a selected strength.</span></button>
+        <button type="button" data-session="profile"><b>Build a bot from my games</b><span>Import PGN or FEN samples and infer your playing personality.</span></button>
+      </div>
+      <div id="sessionOptions" hidden>
+        <button id="sessionBackButton" class="text-button" type="button">← All options</button>
+        <p id="sessionDescription" class="session-description"></p>
+        <label id="fenField">Position in FEN<textarea id="fenInput" rows="3" placeholder="Paste a complete FEN position"></textarea></label>
+        <div id="personalityFields" class="range-fields personality-grid">
+          <label><span>Playstyle / attack <output id="attackValue">50</output></span><input id="attackInput" type="range" min="0" max="100" value="50"><small>Foundational → explosive. Higher values favor checks, captures, promotions, and active development.</small></label>
+          <label><span>Risk <output id="riskValue">35</output></span><input id="riskInput" type="range" min="0" max="100" value="35"><small>Controls how much engine score may be conceded for style. It does not make reckless moves attractive by itself.</small></label>
+          <label><span>Variety <output id="varietyValue">25</output></span><input id="varietyInput" type="range" min="0" max="100" value="25"><small>Low values repeat the top choices. Higher values vary among sound candidates and flatten opening-book frequency.</small></label>
+          <label><span>Tenacity <output id="tenacityValue">60</output></span><input id="tenacityInput" type="range" min="0" max="100" value="60"><small>Fragile → resilient. Higher values reward king safety, defended pieces, and moves that reduce pressure.</small></label>
+          <label><span>Accuracy <output id="accuracyValue">65</output></span><input id="accuracyInput" type="range" min="0" max="100" value="65"><small>Controls loyalty to the engine score. High accuracy strongly penalizes second-best moves.</small></label>
+          <label><span>Temperament <output id="temperamentValue">45</output></span><input id="temperamentInput" type="range" min="0" max="100" value="45"><small>Conservative → reckless. Chooses quiet or volatile positions inside the loss allowed by Risk.</small></label>
+          <label><span>Endgame precision <output id="endgamesValue">60</output></span><input id="endgamesInput" type="range" min="0" max="100" value="60"><small>Casual → precise. In simplified positions, higher values narrow the candidate pool and emphasize exact play.</small></label>
+        </div>
+        <label id="eloField">Estimated Elo <output id="eloValue">2000</output><input id="eloInput" type="range" min="800" max="2800" step="50" value="2000"></label>
+        <div id="engineFields">
+          <label>Engine<select id="engineInput"></select></label>
+          <label>Your color<select id="engineColorInput"><option value="white">White</option><option value="black">Black</option></select></label>
+          <label>Approximate Elo <output id="engineEloValue">2000</output><input id="engineEloInput" type="range" min="800" max="2800" step="50" value="2000"></label>
+          <p id="engineStrengthNote" class="field-note"></p>
+        </div>
+        <div id="profileFields">
+          <label>Color you played in these games<select id="profileColorInput"><option value="white">White</option><option value="black">Black</option></select></label>
+          <label>Your game files<input id="profileFilesInput" type="file" accept=".pgn,.fen,.txt" multiple></label>
+          <p class="field-note">PGNs give the best profile. FEN files may contain one complete FEN per line and provide lower-confidence positional samples.</p>
+          <section id="profileResult" class="profile-result" hidden>
+            <h3>Your inferred personality</h3>
+            <div id="profileMetrics" class="profile-metrics"></div>
+            <div id="profileSummary"></div>
+            <button id="playProfileButton" class="button primary" type="button">Play this personality</button>
+          </section>
+        </div>
+        <div class="dialog-actions"><button id="setupCancelButton" class="button quiet" type="button">Cancel</button><button id="startSessionButton" class="button primary" type="submit">Start session</button></div>
+      </div>
+      <p id="setupError" class="form-error" role="alert"></p>
+    </form>
+  </dialog>
+
+  <dialog id="promotionDialog" class="dialog promotion-dialog"><form method="dialog"><div class="dialog-heading"><div><span class="section-number">PROMOTION</span><h2>Choose a piece</h2></div></div><div id="promotionChoices" class="promotion-choices"></div></form></dialog>
+  <dialog id="saveDialog" class="dialog save-dialog"><form method="dialog"><div class="dialog-heading"><div><span class="section-number">EXPORT</span><h2>Save this session</h2></div><button id="saveCloseButton" class="icon-button" type="submit" aria-label="Close">×</button></div><p class="session-description">Choose the format to download.</p><div class="save-choices"><button class="button primary" type="button" data-export="pgn">Game as PGN</button><button class="button quiet" type="button" data-export="fen">Position as FEN</button></div></form></dialog>
+  <dialog id="inviteDialog" class="dialog invite-dialog">
+    <form id="inviteForm">
+      <div class="dialog-heading"><div><span class="section-number">CASUAL 1V1</span><h2>Invite a player</h2></div><button id="inviteCloseButton" class="icon-button" type="button" aria-label="Close">&times;</button></div>
+      <div id="inviteOptions">
+        <p class="session-description">Create a private, one-match link. No engine lines or learner's guide appear during the match.</p>
+        <label id="opponentUsernameField" hidden>Invite by username (optional)<input id="opponentUsernameInput" type="text" minlength="3" maxlength="10" pattern="[A-Za-z0-9_]{3,10}" autocomplete="off" placeholder="player_1"><small>Leave blank for a general link. A username invite can only be accepted by that signed-in player.</small></label>
+        <label id="guestNameField">Your display name<input id="guestNameInput" type="text" maxlength="32" autocomplete="nickname" placeholder="Guest player"><small>Signed-in players use the name on their Dinnerbone profile.</small></label>
+        <label>Chess mode<select id="variantInput">
+          <option value="standard">Standard</option><option value="chess960">Chess960</option><option value="crazyhouse">Crazyhouse</option><option value="threecheck">Three-check</option><option value="antichess">Lose to Win</option><option value="atomic">Atomic</option><option value="horde">Horde</option><option value="kingofthehill">King of the Hill</option><option value="racingkings">Racing Kings</option>
+        </select><small id="variantDescription">Classic chess.</small></label>
+        <div class="invite-fields">
+          <label>Time per player<select id="baseTimeInput"><option value="0">Unlimited</option><option value="1">1 minute</option><option value="2">2 minutes</option><option value="3">3 minutes</option><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option></select></label>
+          <label>Increment<select id="incrementInput"><option value="0" selected>None</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option><option value="15">15 seconds</option><option value="30">30 seconds</option></select></label>
+          <label>Your color<select id="creatorColorInput"><option value="random">Random</option><option value="white">White</option><option value="black">Black</option></select></label>
+        </div>
+        <p id="inviteError" class="form-error" role="alert"></p>
+        <div class="dialog-actions"><button id="inviteCancelButton" class="button quiet" type="button">Cancel</button><button class="button primary" type="submit">Create match link</button></div>
+      </div>
+      <div id="inviteCreated" hidden>
+        <p id="inviteCreatedDescription" class="session-description">Your match is ready. Send this link to one player.</p>
+        <label>One-time invite link<div class="copy-field"><input id="inviteLink" type="text" readonly><button id="copyInviteButton" class="button quiet" type="button">Copy</button></div></label>
+        <p id="inviteExpiryNote" class="field-note">The one-time link accepts one friend and expires in five minutes. Once joined, the game stays available for play.</p>
+        <div class="dialog-actions"><button id="enterMatchButton" class="button primary" type="button">Enter match</button></div>
+      </div>
+    </form>
+  </dialog>
+  <dialog id="accountDialog" class="dialog account-dialog">
+    <div class="account-shell">
+      <div class="dialog-heading"><div><span class="section-number">ONLINE</span><h2>Your Dinnerbone account</h2></div><button id="accountCloseButton" class="icon-button" type="button" aria-label="Close">&times;</button></div>
+      <section id="accountSignedOut">
+        <p class="session-description">Play freely as a guest, or connect Google to keep completed online games, favorites, and personal stats on this server.</p>
+        <button id="googleSignInButton" class="button google-button" type="button"><span>G</span> Continue with Google</button>
+        <p id="googleSetupHint" class="field-note"></p>
+      </section>
+      <section id="accountSignedIn" hidden>
+        <div class="account-profile"><div><span class="micro-badge">SIGNED IN</span><h3 id="accountName"></h3><p id="accountEmail"></p><strong id="accountRating" class="account-rating"></strong></div><button id="logoutButton" class="button quiet" type="button">Sign out</button></div>
+        <form id="accountNameForm" class="account-name-form"><label>Username<input id="accountNameInput" type="text" minlength="3" maxlength="10" pattern="[A-Za-z0-9_]{3,10}" autocomplete="username" placeholder="player_1"><small>3–10 letters, numbers, or underscores. Usernames are unique.</small></label><button class="button quiet" type="submit">Save username</button></form>
+        <p id="accountError" class="form-error" role="alert"></p>
+        <section id="accountInvitationsSection" class="account-subsection" hidden><div class="account-games-heading"><h3>Invitations</h3><span>Direct username invites</span></div><div id="accountInvitations" class="account-games"></div></section>
+        <div id="accountStats" class="account-stats"></div>
+        <div class="account-games-heading"><h3>History</h3><span>Completed online matches save automatically</span></div>
+        <div id="accountGames" class="account-games"></div>
+      </section>
+      <section class="account-subsection"><div class="account-games-heading"><h3>Find a player</h3><span>Public profiles and history</span></div><form id="playerSearchForm" class="player-search-form"><input id="playerSearchInput" type="text" minlength="3" maxlength="10" pattern="[A-Za-z0-9_]{3,10}" placeholder="username" aria-label="Username"><button class="button quiet" type="submit">View</button></form><p id="publicProfileError" class="form-error" role="alert"></p><div id="publicProfile"></div></section>
+    </div>
+  </dialog>
+  <script src="/app.js?v=20260817a" defer></script>
+</body>
+</html>
