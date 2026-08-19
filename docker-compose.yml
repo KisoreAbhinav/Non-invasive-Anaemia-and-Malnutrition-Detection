@@ -7,9 +7,12 @@ services:
       APP_RUNTIME_MODE: raspi-local
       BACKEND_CORS_ORIGINS: http://localhost:8080,http://localhost:5173
       STT_MODE: backend
-      STT_PROVIDER: mock
+      STT_PROVIDER: vosk
       TTS_MODE: backend
-      TTS_PROVIDER: mock
+      TTS_PROVIDER: piper
+      TTS_LENGTH_SCALE: "1.2"
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
       QUESTIONNAIRE_PATH: config/questionnaire.default.json
       PREDICTION_MODELS_PATH: config/prediction-models.default.json
       PREDICTION_DEFAULT_MODEL: baseline-rule-v1
@@ -21,7 +24,7 @@ services:
           "CMD",
           "python",
           "-c",
-          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')",
         ]
       interval: 15s
       timeout: 5s
