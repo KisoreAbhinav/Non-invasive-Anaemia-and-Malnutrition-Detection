@@ -118,13 +118,16 @@ def build_dataloaders(
 
     val_ds = _TransformSubset(val_ds, val_tf)  # type: ignore[assignment]
 
+    persistent = num_workers > 0
     train_loader = DataLoader(
         train_ds, batch_size=batch_size, shuffle=True,
         num_workers=num_workers, pin_memory=True,
+        persistent_workers=persistent,
     )
     val_loader = DataLoader(
         val_ds, batch_size=batch_size, shuffle=False,
         num_workers=num_workers, pin_memory=True,
+        persistent_workers=persistent,
     )
 
     LOGGER.info("Dataset: %d train, %d val, %d classes: %s", train_count, val_count, num_classes, class_names)
@@ -204,7 +207,7 @@ def train_one_epoch(model: nn.Module, loader: DataLoader, criterion: nn.Module, 
     correct = 0
     total = 0
     for images, labels in loader:
-        images, labels = images.to(device), labels.to(device)
+        images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
         optimizer.zero_grad()
         outputs = model(images)
         loss = criterion(outputs, labels)
@@ -223,7 +226,7 @@ def evaluate(model: nn.Module, loader: DataLoader, criterion: nn.Module, device:
     correct = 0
     total = 0
     for images, labels in loader:
-        images, labels = images.to(device), labels.to(device)
+        images, labels = images.to(device, non_blocking=True), labels.to(device, non_blocking=True)
         outputs = model(images)
         loss = criterion(outputs, labels)
         total_loss += loss.item() * images.size(0)
