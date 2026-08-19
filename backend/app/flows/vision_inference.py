@@ -41,10 +41,11 @@ def _image_tensor(image_bytes: bytes, metadata: dict[str, Any]) -> Any:
     if not center_crop and (new_w != target_w or new_h != target_h):
         image = image.resize((target_w, target_h))
 
+    final_w, final_h = image.size
     import torch
 
     tensor = torch.frombuffer(memoryview(image.tobytes()), dtype=torch.uint8)
-    tensor = tensor.reshape(height, width, 3).permute(2, 0, 1).unsqueeze(0).float()
+    tensor = tensor.reshape(final_h, final_w, 3).permute(2, 0, 1).unsqueeze(0).float()
     if preprocessing.get("scale") == [0, 1] or preprocessing.get("scale") == [0.0, 1.0]:
         tensor = tensor / 255.0
     mean, std = preprocessing.get("mean"), preprocessing.get("std")
