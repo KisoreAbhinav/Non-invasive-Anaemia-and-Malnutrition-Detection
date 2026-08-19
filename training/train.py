@@ -56,6 +56,25 @@ DEFAULTS: dict[str, Any] = {
 }
 
 
+class TransformSubset(torch.utils.data.Dataset):
+    """Wrap a Subset with a different transform for validation."""
+
+    def __init__(self, subset: torch.utils.data.Subset, tf: transforms.Compose) -> None:
+        self.subset = subset
+        self.dataset = subset.dataset
+        self.indices = subset.indices
+        self.tf = tf
+
+    def __len__(self) -> int:
+        return len(self.subset)
+
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
+        img, label = self.subset.dataset.samples[self.subset.indices[idx]]
+        from PIL import Image
+        img = Image.open(img).convert("RGB")
+        return self.tf(img), label
+
+
 # ── Data ──────────────────────────────────────────────────────────────
 
 def build_transforms(image_size: int, mean: list[float], std: list[float], train: bool = True) -> transforms.Compose:
@@ -102,21 +121,7 @@ def build_dataloaders(
     val_ds.dataset = datasets.ImageFolder(str(data_dir), transform=val_tf)
     # random_split uses indices, so val_ds still uses train transforms on the
     # underlying dataset.  Override with a wrapper:
-    class _TransformSubset(torch.utils.data.Dataset):
-        def __init__(self, subset: torch.utils.data.Subset, tf: transforms.Compose) -> None:
-            self.subset = subset
-            self.dataset = subset.dataset
-            self.indices = subset.indices
-            self.tf = tf
-        def __len__(self) -> int:
-            return len(self.subset)
-        def __getitem__(self, idx: int) -> tuple[torch.Tensor, int]:
-            img, label = self.subset.dataset.samples[self.subset.indices[idx]]
-            from PIL import Image
-            img = Image.open(img).convert("RGB")
-            return self.tf(img), label
-
-    val_ds = _TransformSubset(val_ds, val_tf)  # type: ignore[assignment]
+    val_ds = TransformSubset(val_ds, val_tf)  # type: ignore[assignment]
 
     persistent = num_workers > 0
     train_loader = DataLoader(
