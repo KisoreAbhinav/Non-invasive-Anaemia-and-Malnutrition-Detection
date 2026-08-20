@@ -9,12 +9,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from app.config_loader import read_json_object
 from app.flows import model_registry
 from app.flows.growth_standards import assess_child_growth
+from app.flows.vision_inference import predict_batch, predict_image
 from app.settings import settings
 
 router = APIRouter(prefix="/api/flows/screening", tags=["screening"])
@@ -32,6 +33,7 @@ class PlanRequest(BaseModel):
 class VisualResult(BaseModel):
     test_id: str
     value: Any = None
+    score: float | None = Field(default=None, ge=0, le=1)
     confidence: float | None = Field(default=None, ge=0, le=1)
     invalidated: bool = False
     status: str | None = None
@@ -52,6 +54,35 @@ class TestClassificationRequest(BaseModel):
 
 def _visual_schema() -> dict[str, Any]:
     return read_json_object(settings.visual_cues_path)
+
+
+def _model_availability(test: dict[str, Any]) -> dict[str, Any]:
+    """Resolve a test's model status, including multi-site model groups."""
+
+    sub_captures = test.get("sub_captures")
+    if not sub_captures:
+        return model_registry.status([test["id"]])[test["id"]]
+
+    model_ids = [capture.get("model_dir", capture["id"]) for capture in sub_captures]
+    statuses = model_registry.status(model_ids)
+    missing = [model_id for model_id in model_ids if not statuses[model_id]["available"]]
+    available = not missing
+    return {
+        "available": available,
+        "status": "will_run" if available else "no_model_installed",
+        "message": (
+            "will run all site models"
+            if available
+            else f"missing site models: {', '.join(missing)}"
+        ),
+        "model": [statuses[model_id]["model"] for model_id in model_ids] if available else None,
+        "metadata": (
+            {model_id: statuses[model_id]["metadata"] for model_id in model_ids}
+            if available
+            else None
+        ),
+        "error": None if available else f"missing model artifacts for {', '.join(missing)}",
+    }
 
 
 def _clinical_schema() -> dict[str, Any]:
@@ -142,12 +173,6 @@ def build_plan(
             test_id,
         ),
     )
-    model_test_ids = [
-        test_id
-        for test_id in ordered_ids
-        if test_by_id[test_id].get("execution_type") != "physical"
-    ]
-    availability = model_registry.status(model_test_ids)
     ordered_tests: list[dict[str, Any]] = []
     for order, test_id in enumerate(ordered_ids, start=1):
         test = test_by_id[test_id]
@@ -166,7 +191,7 @@ def build_plan(
                 "error": None,
             }
             if test.get("execution_type") == "physical"
-            else availability[test_id]
+            else _model_availability(test)
         )
         ordered_tests.append(test)
 
@@ -372,7 +397,13 @@ def calculate_result(payload: ResultRequest) -> dict[str, Any]:
             value, row_status = rendered_value, "complete"
             if threshold_override:
                 test["threshold"] = threshold_override
-            score_value = item.confidence if item.confidence is not None else derived_score
+            score_value = (
+                item.score
+                if item.score is not None
+                else item.confidence
+                if item.confidence is not None
+                else derived_score
+            )
             if score_value is not None:
                 sensor_scores[test["category"]].append(float(score_value))
             usable_inputs += 1
@@ -542,9 +573,7 @@ def calculate_result(payload: ResultRequest) -> dict[str, Any]:
 async def screening_status() -> dict[str, Any]:
     schema = _visual_schema()
     tests = schema.get("tests", [])
-    statuses = model_registry.status(
-        [test["id"] for test in tests if test.get("execution_type") != "physical"]
-    )
+    statuses: dict[str, dict[str, Any]] = {}
     for test in tests:
         if test.get("execution_type") == "physical":
             statuses[test["id"]] = {
@@ -555,6 +584,8 @@ async def screening_status() -> dict[str, Any]:
                 "metadata": None,
                 "error": None,
             }
+        else:
+            statuses[test["id"]] = _model_availability(test)
     return {"flow": "screening", "status": "ready", "tests": statuses}
 
 
@@ -566,6 +597,73 @@ async def screening_plan(payload: PlanRequest) -> dict[str, Any]:
 @router.post("/result")
 async def screening_result(payload: ResultRequest) -> dict[str, Any]:
     return calculate_result(payload)
+
+
+@router.post("/vision/{test_id}")
+async def screening_vision(test_id: str, population: str, request: Request) -> dict[str, Any]:
+    """Run a configured single-image or multi-site vision test."""
+
+    if population not in ELIGIBLE_POPULATIONS:
+        raise HTTPException(status_code=422, detail="Unsupported population")
+    plan = build_plan(population, {}, {})
+    test = next((item for item in plan["visual_cues"] if item["id"] == test_id), None)
+    if test is None:
+        raise HTTPException(status_code=404, detail="Test not applicable")
+    if not test["availability"]["available"]:
+        raise HTTPException(status_code=409, detail=test["availability"]["message"])
+
+    sub_captures = test.get("sub_captures")
+    content_type = request.headers.get("content-type", "").lower()
+    if sub_captures:
+        if not content_type.startswith("multipart/form-data"):
+            raise HTTPException(
+                status_code=415,
+                detail="Expected multipart/form-data for multi-site test",
+            )
+        try:
+            form = await request.form()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail="Could not parse multipart upload") from exc
+
+        images: list[bytes] = []
+        for capture in sub_captures:
+            upload = form.get(capture["id"])
+            if upload is None or not hasattr(upload, "read"):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Missing image for {capture.get('label', capture['id'])}",
+                )
+            upload_type = str(getattr(upload, "content_type", "") or "").lower()
+            if upload_type and not upload_type.startswith("image/"):
+                raise HTTPException(
+                    status_code=415,
+                    detail=f"{capture.get('label', capture['id'])} must be an image",
+                )
+            image_bytes = await upload.read()
+            if not image_bytes:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Empty image for {capture.get('label', capture['id'])}",
+                )
+            images.append(image_bytes)
+        try:
+            return predict_batch(sub_captures, images)
+        except LookupError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    if not content_type.startswith("image/"):
+        raise HTTPException(status_code=415, detail="Upload an image/jpeg or image/png body")
+    image_bytes = await request.body()
+    if not image_bytes:
+        raise HTTPException(status_code=422, detail="Uploaded image is empty")
+    try:
+        return predict_image(test_id, image_bytes)
+    except LookupError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 @router.post("/test-result")

@@ -3,13 +3,18 @@
   "tests": [
     {
       "id": "pallor",
-      "name": "Conjunctival, nail, palm & tongue pallor",
-      "description": "Camera inspection for pallor-related anemia risk; this is a probabilistic risk estimate, not an Hb reading.",
+      "name": "Conjunctival, nail & palm pallor",
+      "description": "Camera screening for pallor-related anemia risk across three body sites; this is not an Hb reading or diagnosis.",
       "category": "anemia",
       "populations": ["child_under5", "child_5_12", "pregnant_woman", "adult_nonpregnant"],
       "base_priority": 80,
       "threshold": "Clinical pallor risk (probabilistic)",
-      "overrides_verdict": false
+      "overrides_verdict": false,
+      "sub_captures": [
+        { "id": "pallor_eye", "label": "EYE", "model_dir": "pallor_eye" },
+        { "id": "pallor_nail", "label": "NAILBED", "model_dir": "pallor_nail" },
+        { "id": "pallor_palm", "label": "PALM", "model_dir": "pallor_palm" }
+      ]
     },
     {
       "id": "muac",

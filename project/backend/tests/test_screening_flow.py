@@ -168,3 +168,23 @@ def test_registry_detects_valid_contract_without_loading_torch(tmp_path: Path) -
         assert model_registry.status(["edema"])["edema"]["status"] == "will_run"
     finally:
         model_registry.scan_models()
+
+
+def test_model_primary_score_is_used_for_sensor_fusion() -> None:
+    result = calculate_result(
+        ResultRequest(
+            population="child_under5",
+            answers={},
+            scores=scores(0.2, 0.1),
+            visual_results=[
+                {
+                    "test_id": "pallor",
+                    "value": {"scores": {"risk": 0.8}},
+                    "score": 0.8,
+                    "confidence": 0.95,
+                }
+            ],
+        )
+    )
+
+    assert result["fused_scores"]["anemia"] == 0.62
