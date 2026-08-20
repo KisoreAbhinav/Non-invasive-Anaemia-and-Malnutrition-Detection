@@ -115,6 +115,13 @@ def is_available(test_id: str) -> bool:
     return bool(entry and entry.available)
 
 
+def get_metadata(test_id: str) -> dict[str, Any] | None:
+    """Return a shallow copy of a model's validated serving contract."""
+
+    entry = _entry(test_id)
+    return dict(entry.metadata) if entry and entry.metadata else None
+
+
 def get_model(test_id: str) -> Any | None:
     """Return a cached TorchScript module, or None for an unavailable test."""
 
