@@ -105,6 +105,18 @@ The reported validation figures are not proof of clinical generalization. Nail a
 - Regenerated `uv.lock` without upgrading unrelated packages. The existing CPU-only PyTorch source remains unchanged.
 - Frontend packages, environment variables, Dockerfiles, Compose configuration, and nginx/Vite configuration required no substantive merge. The feature copies differ only by line endings in those files.
 
+## Verification
+
+- `79 passed` for the complete backend pytest suite, including main's questionnaire, audio fallback, WHO growth, health, screening/fusion, preprocessing, multipart, and model-registry tests.
+- `scripts/verify_vision_inference.py` initialized the installed registry and submitted three generated 640x480 JPEGs through the real multipart FastAPI route. All three MobileNetV3-Large models loaded on CPU; the response contained finite `normal`/`risk` probabilities summing to one, per-site results, and a combined primary risk score. The smoke input classified `normal` with combined risk `0.137951`.
+- The same script accepts `--eye`, `--nail`, and `--palm` paths together for repeatable operator checks with real labeled images.
+- `npm run build` completed successfully with Vite: 31 modules transformed and production assets emitted.
+- `docker compose config --quiet` passed.
+- A pre-existing questionnaire regression was found during the full suite: the short answer `no` tied with the opposite fatigue synonym `no stamina`, leaving the integration flow in an endless repeat. A focused scoring guard and regression test fixed it in its own commit.
+- TorchScript emits upstream deprecation warnings under the installed future PyTorch version, but loading and inference are successful. Migration to `torch.export` is a future artifact-format change, not required for this merge.
+
+Browser camera permission and physical capture quality require a real kiosk/browser and were not hardware-tested in this environment. The frontend production build and backend multipart contract are verified; the reusable script verifies the same server inference path without camera hardware.
+
 ## Merge summary
 
 Pending implementation and verification.
