@@ -98,6 +98,13 @@ The feature history contained several independent failure modes rather than one 
 
 The reported validation figures are not proof of clinical generalization. Nail and palm datasets contain multiple similarly named images per subject and the trainer splits by image, so train/validation subject leakage is possible. Eye validation accuracy is only 0.626. These limitations must remain visible in the UI/docs; the output is a screening signal, not a diagnosis or hemoglobin measurement.
 
+## Dependency and configuration resolution
+
+- Added Pillow as a direct dependency for upload decoding and `python-multipart` for FastAPI's three-file form parsing, matching the feature branch.
+- Added NumPy as a direct dependency because the serving code imports it for CIE Lab conversion; relying on sentence-transformers to install it transitively would make the inference contract fragile.
+- Regenerated `uv.lock` without upgrading unrelated packages. The existing CPU-only PyTorch source remains unchanged.
+- Frontend packages, environment variables, Dockerfiles, Compose configuration, and nginx/Vite configuration required no substantive merge. The feature copies differ only by line endings in those files.
+
 ## Merge summary
 
 Pending implementation and verification.
