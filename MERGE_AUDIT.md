@@ -72,7 +72,31 @@ The three pallor directories also contain timestamped small/large backups. Only 
 
 ## Root cause
 
-Pending executable reproduction and targeted verification in Phase 2.
+The feature history contained several independent failure modes rather than one model-loading problem.
+
+1. **A hard preprocessing crash.** Revision `fbb10e3` renamed resize variables to `target_w`/`target_h` but still reshaped with undefined `height`/`width` names. Replaying that code produced `NameError: name 'height' is not defined` before the model call.
+2. **Incorrect aspect-ratio resize and crop.** The next revision used `min(target_w / width, target_h / height)` for square shorter-side resize. A 640x480 frame therefore became 256x192, and its requested 224 crop began at `(16, -16)`, padding 32 rows instead of matching torchvision's 341x256 resize and valid center crop. This changed the image distribution and could suppress the relevant body site.
+3. **Training/serving color-space skew.** The first Lab inference implementation used Pillow's byte-encoded `Image.convert("LAB")`, while the final training pipeline uses a continuous D65 sRGB -> linear RGB -> XYZ -> CIE Lab transform with explicit L/a/b scaling. The two encodings are not interchangeable around neutral a/b values, where the pallor signal is subtle. Feeding the wrong encoding yielded unreliable/near-boundary behavior even when the model loaded.
+4. **Wrong artifacts advertised as usable models.** `edema`, `hair_skin`, and the generic `pallor` artifacts are placeholder pretrained backbones with replacement two-class heads, not domain-trained models. The registry only validates file shape/metadata, so the UI advertises them as available and returns arbitrary but plausible-looking probabilities. The merge must install only the three trained site-specific pallor exports and leave untrained tests unavailable.
+5. **The feature UI has a separate camera lifecycle defect.** Earlier UI code rendered one shared ref on multiple video elements, so React retained the final node. The current feature code renders only the active video slot, but its auto-start effect does not depend on `testIndex` or `currentTestResult`; after moving to another camera test, the stream may not reopen. Stream attachment logic is also duplicated. The port should use a single callback ref/effect and make test transitions explicit dependencies.
+6. **Required runtime packages were omitted from main.** Pillow is required to decode uploads and `python-multipart` is required for the three-image form. Without the merged dependency lock, image inference or multipart parsing fails before useful output.
+
+### Executable diagnosis results
+
+- All six TorchScript files loaded on CPU, accepted `[1,3,224,224]`, returned finite `[1,2]` logits, and had label counts matching metadata. Artifact corruption is not the cause.
+- The corrected current pallor preprocessor produced a finite `[1,3,224,224]` tensor from a 640x480 JPEG.
+- On five normal and five risk images per site from the available labeled data, the deployed models classified 29/30 as labeled. This is a smoke check, not an independent clinical evaluation.
+- A real multipart request through the FastAPI route returned HTTP 200. The all-normal example produced `normal` with combined risk `0.060400`; the all-risk example produced `risk` with combined risk `0.905903`.
+- Both feature inference contract tests passed. They cover single-image routing and three-part multipart aggregation.
+
+### Resolution selected for the merge
+
+- Port the final standards-based Lab conversion and corrected shorter-side resize/center crop, with regression tests for non-square images and train/serve transform equivalence.
+- Port only canonical trained `pallor_eye`, `pallor_nail`, and `pallor_palm` runtime pairs. Do not copy generic/placeholder models, backup generations, checkpoints, logs, or datasets.
+- Preserve main's physical-input behavior and API contracts; add the vision route and primary risk score as backward-compatible fields.
+- Repair camera lifecycle while reconciling the feature UI instead of copying it verbatim.
+
+The reported validation figures are not proof of clinical generalization. Nail and palm datasets contain multiple similarly named images per subject and the trainer splits by image, so train/validation subject leakage is possible. Eye validation accuracy is only 0.626. These limitations must remain visible in the UI/docs; the output is a screening signal, not a diagnosis or hemoglobin measurement.
 
 ## Merge summary
 
