@@ -2,7 +2,7 @@
 
 Non-invasive anaemia and malnutrition risk screening on local edge devices.
 
-## Stage 1 + Stage 2 screening flow
+## Complete screening flow
 
 - `backend/`: FastAPI with independent flow modules
   - `questionnaire`
@@ -10,16 +10,18 @@ Non-invasive anaemia and malnutrition risk screening on local edge devices.
   - `tts`
   - `prediction`
   - `runtime` (central runtime/audio config surface)
-- `frontend/`: Vite React session UI with microphone recording, local WAV
-  conversion, answer confirmation, and score results
+- `frontend/`: Vite React kiosk UI with microphone recording, camera/file
+  capture, answer confirmation, and model/fused-score results
 - `docker-compose.yml`: local run for both services
 
-Stage 2 adds an 800×480 kiosk UI, continuous silence-detected listening,
+The application includes an 800×480 kiosk UI, continuous silence-detected listening,
 adaptive non-invasive test planning, risk-aware clinical fields, explicit skip
 state, result fusion, and spoken verdicts. MUAC is entered as a physical tape
 measurement, while child weight, height, age, and sex are converted offline to
-WHO 2006/2007 growth Z-scores. Camera/vision test execution remains an honest
-placeholder until its models are installed.
+WHO 2006/2007 growth Z-scores. Anaemia screening captures conjunctiva, nail-bed,
+and palm images, runs three local TorchScript models, and displays per-site plus
+combined probabilities. Untrained edema and hair/skin tests remain unavailable
+instead of returning placeholder predictions.
 
 The questionnaire is config-first and derives one of four populations before
 walking only the eligible questions: `child_under5`, `child_5_12`,
@@ -40,6 +42,17 @@ cd backend
 uv sync
 uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+Local frontend run in another terminal:
+
+```bash
+cd frontend
+npm ci
+npm run dev
+```
+
+The Vite development server is available at `http://localhost:5173` and proxies
+API requests to the backend on port 8000.
 
 ## Config-first architecture
 
@@ -73,6 +86,7 @@ API surfaces for harness integration:
 - `GET /api/flows/prediction/models`
 - `GET /api/flows/screening/status`
 - `POST /api/flows/screening/plan`
+- `POST /api/flows/screening/vision/{test_id}?population={population}`
 - `POST /api/flows/screening/result`
 
 Questionnaire session API:
@@ -84,7 +98,41 @@ Questionnaire session API:
 - `GET /api/flows/questionnaire/session/{id}`
 - `POST /api/flows/questionnaire/session/{id}/skip`
 
-## Vision models (drop-in)
+## Vision inference
+
+The repository includes three trained CPU TorchScript exports:
+
+- `backend/models/vision/pallor_eye/`
+- `backend/models/vision/pallor_nail/`
+- `backend/models/vision/pallor_palm/`
+
+Each image is resized with shorter-side semantics, center-cropped to 224×224,
+converted from sRGB to standards-based D65 CIE Lab, and normalized using its
+`model.json` contract. The pallor endpoint requires all three multipart fields,
+runs the site-specific models, and reports the unweighted mean risk probability.
+The UI supports sequential camera capture, retake, and file upload fallback.
+
+Run a pipeline smoke test after setup:
+
+```bash
+cd backend
+uv run python scripts/verify_vision_inference.py
+```
+
+For an operator check with labeled images:
+
+```bash
+uv run python scripts/verify_vision_inference.py \
+  --eye /path/to/eye.jpg \
+  --nail /path/to/nail.jpg \
+  --palm /path/to/palm.jpg
+```
+
+The generated-image default verifies decoding, preprocessing, model loading,
+multipart routing, aggregation, and response contracts. It does not validate
+clinical accuracy.
+
+### Drop-in model contract
 
 Each model-backed non-invasive test has a folder under
 `backend/models/vision/`. Install a CPU TorchScript model by adding `model.pt`
@@ -92,6 +140,15 @@ and a matching `model.json`, then restart. The registry reports incomplete or
 missing pairs as unavailable and the flow skips them without failing. Physical
 MUAC and WHO growth measurements bypass the registry. The full metadata
 contract and example are in `backend/models/vision/README.md`.
+
+### Clinical limitations
+
+These outputs are screening signals, not diagnoses or hemoglobin measurements.
+The eye model's recorded validation accuracy is 0.626. Nail and palm validation
+scores are higher, but their image-level split may contain multiple images from
+the same subject across train and validation sets. Independent subject-level,
+device-specific, and population-specific validation is still required before
+clinical use. The UI and final API retain the screening-only disclaimer.
 
 ## Speech models
 
@@ -156,10 +213,10 @@ Compose is configured for the installed real offline providers:
 `STT_PROVIDER: vosk` and `TTS_PROVIDER: piper`. To run the adaptive flow
 without speech inference, temporarily change both values to `mock`.
 
-Runtime model binaries are intentionally excluded from Git. A clean Docker
-build downloads the lightweight Indian-English Vosk model, the Piper voice,
-and the semantic matcher into the container image. Vision models remain
-optional drop-ins and unavailable tests are reported honestly.
+Large speech assets remain excluded from Git. A clean Docker build downloads
+the Indian-English Vosk model, Piper voice, and semantic matcher into the
+container image. The three trained pallor artifacts are committed; other vision
+tests remain optional drop-ins and unavailable tests are reported honestly.
 
 - Frontend: `http://localhost:8080`
 - Backend health: `http://localhost:8000/api/health`
@@ -177,6 +234,16 @@ branching, and final scoring), run:
 ```bash
 cd backend
 uv run python scripts/verify_stage1_workflow.py
+```
+
+Run the complete automated backend regression suite and frontend build with:
+
+```bash
+cd backend
+uv run pytest
+
+cd ../frontend
+npm run build
 ```
 
 ## Raspberry Pi 5

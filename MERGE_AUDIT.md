@@ -119,4 +119,38 @@ Browser camera permission and physical capture quality require a real kiosk/brow
 
 ## Merge summary
 
-Pending implementation and verification.
+The main-based application now includes working three-site pallor inference without replacing main's architecture or touching `Simulation Demo/`.
+
+### Merged
+
+- Three canonical MobileNetV3-Large TorchScript/metadata pairs for conjunctiva, nail-bed, and palm pallor.
+- Correct CIE Lab preprocessing, shape/metadata checks, finite-output validation, softmax label mapping, and consistent three-site aggregation.
+- Aggregate model availability: pallor is runnable only when all three site models are installed. Untrained edema, hair/skin, and generic pallor placeholders are not shipped or advertised.
+- FastAPI multipart inference endpoint, explicit upload validation/error codes, per-site response data, and primary risk score propagation into sensor fusion.
+- Sequential three-slot camera UI, stable fixed preview layout, retake controls, image-upload fallback, score visualization, stream cleanup, and camera restart across test transitions.
+- Explicit Pillow, python-multipart, and NumPy dependencies while preserving the CPU-only PyTorch index and all existing container configuration.
+- Preprocessing, registry, multipart, aggregation, fusion, and reusable real-model verification coverage.
+- Updated root/project run instructions, model workflow, and limitations.
+
+### Bugs fixed
+
+- Undefined preprocessing reshape dimensions.
+- Incorrect non-square resize ratio and out-of-bounds center cropping.
+- Pillow-Lab versus standards-based training/serving skew.
+- Placeholder model artifacts producing arbitrary probabilities while appearing usable.
+- Group test availability incorrectly depending on a generic `pallor/model.pt` instead of all three site models.
+- Model confidence being fused instead of the declared primary risk probability.
+- Shared/dynamic video ref placement, missing file-upload controls, stale camera lifecycle, black captures before video readiness, and premature visual-result recording on failed inference.
+- Main's pre-existing one-word answer ambiguity (`no` versus `no stamina`) that could leave questionnaire sessions repeating forever.
+
+### Known remaining issues
+
+- Clinical generalization is unproven; eye accuracy is weak and nail/palm validation may contain subject leakage.
+- The three sites are equally weighted and use an argmax/0.5 decision boundary; calibration on an independent cohort is needed.
+- Camera permission, lighting, positioning, and Raspberry Pi camera throughput need kiosk hardware acceptance testing.
+- Edema and hair/skin inference remain unavailable until genuinely domain-trained models replace the excluded placeholders.
+- TorchScript works with the locked runtime but is deprecated by the installed PyTorch release; a future versioned contract should migrate artifacts to `torch.export`.
+
+### Review order
+
+Review the checkpoint commits chronologically. Pay particular attention to the artifact hashes/metadata, `vision_inference.py`, grouped availability and upload route in `screening.py`, the camera state changes in `App.jsx`, dependency lock additions, and the verification/clinical caveats above. The branch is intentionally not merged into `main`.
