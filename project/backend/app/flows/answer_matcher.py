@@ -85,6 +85,12 @@ def _fuzzy_option_scores(question: Mapping[str, Any], text: str) -> list[tuple[f
                     score = 93.0
                 else:
                     score = float(fuzz.ratio(text, candidate))
+            elif len(text_tokens) == 1 and len(candidate_tokens) > 1:
+                # token_set_ratio("no", "no stamina") is 100 even though the
+                # longer phrase intentionally belongs to the opposite option.
+                # A one-word response must match its own configured intent,
+                # not win through being a subset of a more specific phrase.
+                score = float(fuzz.ratio(text, candidate))
             else:
                 score = max(
                     float(fuzz.ratio(text, candidate)),

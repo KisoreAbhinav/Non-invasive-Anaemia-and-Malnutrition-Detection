@@ -76,6 +76,15 @@ def test_fatigue_negation_and_idiom(
     assert result.value == expected
 
 
+def test_short_negative_is_not_tied_with_opposite_longer_phrase(
+    schema: dict[str, Any],
+) -> None:
+    result = match_answer(question(schema, "child_anemia_fatigue"), "no")
+
+    assert result.status == "matched"
+    assert result.value == "no"
+
+
 def test_repeat_fixed_intent(schema: dict[str, Any]) -> None:
     result = match_answer(question(schema, "child_anemia_pica"), "please repeat")
     assert result.status == "command"
