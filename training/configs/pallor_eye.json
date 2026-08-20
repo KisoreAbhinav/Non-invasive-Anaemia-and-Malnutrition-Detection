@@ -1,6 +1,6 @@
 {
   "test_id": "pallor_eye",
-  "backbone": "mobilenet_v3_small",
+  "backbone": "mobilenet_v3_large",
   "data_dir": "data/pallor_eye",
   "num_classes": 2,
   "class_labels": ["normal", "risk"],
@@ -10,6 +10,7 @@
   "batch_size": 32,
   "num_workers": 4,
   "learning_rate": 1e-3,
+  "fine_tune_lr_factor": 0.03,
   "weight_decay": 1e-4,
   "freeze_backbone_epochs": 5,
   "val_split": 0.20,
@@ -19,9 +20,11 @@
   "output_activation": "softmax",
   "preprocessing": {
     "color_space": "Lab",
-    "resize": [224, 224],
+    "resize": [256, 256],
+    "center_crop": 224,
     "scale": [0.0, 1.0],
     "mean": [0.5, 0.5, 0.5],
-    "std": [0.5, 0.25, 0.25]
+    "std": [0.5, 0.25, 0.25],
+    "capture": {"center_zoom": 2.2, "saturation": 1.12, "contrast": 1.03}
   }
 }

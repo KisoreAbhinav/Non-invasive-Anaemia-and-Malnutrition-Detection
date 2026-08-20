@@ -8,11 +8,13 @@ backend/models/vision/<test_id>/, alongside a model.json contract.
 Usage (inside your venv, with a CUDA GPU such as an RTX 3050):
     python train_all.py
 
-Hyperparameters are configurable at the top of the file.
+Each model is configured by its matching file in ``training/configs``.  The
+exported contract is generated from that same configuration, so the model we
+train, the model we export, and the preprocessing we advertise cannot drift.
 
 Fixes vs. the previous version of this script (see chat for full detail):
-  1. BACKBONE ("mobilenet_v3_large") is now actually supported in
-     build_model() -- it used to crash immediately.
+  1. Each config's ``backbone`` is loaded and passed to ``build_model()`` --
+     the architecture written in a config is now the architecture trained.
   2. Replaced PIL's Image.convert("LAB") with a correct, continuous
      sRGB -> CIE Lab conversion. PIL's built-in LAB mode encodes negative
      a/b values by wrapping them to the top of the byte range instead of
@@ -74,7 +76,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from PIL import Image
+from PIL import Image, ImageEnhance
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, models, transforms
 
@@ -84,6 +86,7 @@ LOGGER = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).resolve().parent
 CHECKPOINTS_DIR = SCRIPT_DIR / "checkpoints"
 DEFAULT_OUTPUT_ROOT = SCRIPT_DIR.parent / "backend" / "models" / "vision"
+SMOKE_OUTPUT_ROOT = SCRIPT_DIR / "smoke_exports"
 
 LOG_DIR = SCRIPT_DIR / "logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -99,21 +102,6 @@ if __name__ == "__main__":
 
 # ─── HYPERPARAMETERS (easy to modify) ──────────────────────────────────
 
-BACKBONE = "mobilenet_v3_large"      # "mobilenet_v3_small" | "mobilenet_v3_large" | "efficientnet_b0"
-IMAGE_SIZE = 224
-BATCH_SIZE = 32
-NUM_WORKERS = 4                      # set to 0 if you hit DataLoader worker issues
-VAL_SPLIT = 0.15
-EPOCHS_PALM_NAIL = 30
-EPOCHS_EYE = 25
-LR_PALM_NAIL = 3e-3
-LR_EYE = 1e-3
-LR_FINETUNE_FACTOR = 0.1             # LR multiplier applied once the backbone unfreezes
-WEIGHT_DECAY = 1e-4
-FREEZE_BACKBONE_EPOCHS = 5
-CLASS_WEIGHTS = "balanced"
-COLOR_SPACE = "Lab"                  # CIELAB, for pallor color separation
-PRETRAINED = True                    # start from ImageNet RGB weights (first layer adapts)
 SEED = 42
 USE_AMP = True                       # mixed precision -- big win on a 3050's 4GB VRAM
 
@@ -133,38 +121,88 @@ LAB_STD = [0.5, 0.25, 0.25]
 @dataclass
 class ModelSpec:
     test_id: str
+    backbone: str
     data_dir: str
     class_labels: list[str]
     primary_score_key: str
+    image_size: int
     epochs: int
+    batch_size: int
+    num_workers: int
     learning_rate: float
+    fine_tune_lr_factor: float
+    weight_decay: float
+    freeze_backbone_epochs: int
+    val_split: float
+    class_weights: str
+    color_space: str
+    pretrained: bool
+    output_activation: str
+    resize: list[int]
+    center_crop: int
+    scale: list[float]
+    mean: list[float]
+    std: list[float]
+    capture_zoom: float
+    capture_saturation: float
+    capture_contrast: float
+
+
+def load_model_spec(config_name: str) -> ModelSpec:
+    """Load and validate one config instead of silently ignoring it.
+
+    ``train_all_v2.py`` currently supports the Lab pipeline only.  Failing
+    early is safer than accepting RGB metadata while training Lab tensors.
+    """
+    config_path = SCRIPT_DIR / "configs" / config_name
+    raw = json.loads(config_path.read_text(encoding="utf-8"))
+    preprocessing = raw["preprocessing"]
+    capture = preprocessing.get("capture", {})
+    image_size = int(raw["image_size"])
+    resize = [int(v) for v in preprocessing["resize"]]
+    center_crop = int(preprocessing.get("center_crop", image_size))
+    if raw.get("num_classes") != len(raw["class_labels"]):
+        raise ValueError(f"{config_path}: num_classes must equal class_labels length")
+    if raw.get("color_space", preprocessing.get("color_space", "")).upper() != "LAB":
+        raise ValueError(f"{config_path}: only Lab color_space is supported")
+    if len(resize) != 2 or resize[0] != resize[1] or center_crop != image_size:
+        raise ValueError(
+            f"{config_path}: resize must be square [width, height] and center_crop must equal image_size"
+        )
+    return ModelSpec(
+        test_id=raw["test_id"],
+        backbone=raw["backbone"],
+        data_dir=raw["data_dir"],
+        class_labels=list(raw["class_labels"]),
+        primary_score_key=raw["primary_score_key"],
+        image_size=image_size,
+        epochs=int(raw["epochs"]),
+        batch_size=int(raw["batch_size"]),
+        num_workers=int(raw.get("num_workers", 4)),
+        learning_rate=float(raw["learning_rate"]),
+        fine_tune_lr_factor=float(raw.get("fine_tune_lr_factor", 0.03)),
+        weight_decay=float(raw["weight_decay"]),
+        freeze_backbone_epochs=int(raw["freeze_backbone_epochs"]),
+        val_split=float(raw["val_split"]),
+        class_weights=raw["class_weights"],
+        color_space="Lab",
+        pretrained=bool(raw["pretrained"]),
+        output_activation=raw["output_activation"],
+        resize=resize,
+        center_crop=center_crop,
+        scale=list(preprocessing["scale"]),
+        mean=list(preprocessing["mean"]),
+        std=list(preprocessing["std"]),
+        capture_zoom=float(capture.get("center_zoom", 1.0)),
+        capture_saturation=float(capture.get("saturation", 1.0)),
+        capture_contrast=float(capture.get("contrast", 1.0)),
+    )
 
 
 MODELS: list[ModelSpec] = [
-    ModelSpec(
-        test_id="pallor_palm",
-        data_dir="data/pallor_palm",
-        class_labels=["normal", "risk"],
-        primary_score_key="risk",
-        epochs=EPOCHS_PALM_NAIL,
-        learning_rate=LR_PALM_NAIL,
-    ),
-    ModelSpec(
-        test_id="pallor_eye",
-        data_dir="data/pallor_eye",
-        class_labels=["normal", "risk"],
-        primary_score_key="risk",
-        epochs=EPOCHS_EYE,
-        learning_rate=LR_EYE,
-    ),
-    ModelSpec(
-        test_id="pallor_nail",
-        data_dir="data/pallor_fingernail",
-        class_labels=["normal", "risk"],
-        primary_score_key="risk",
-        epochs=EPOCHS_PALM_NAIL,
-        learning_rate=LR_PALM_NAIL,
-    ),
+    load_model_spec("pallor_palm.json"),
+    load_model_spec("pallor_eye.json"),
+    load_model_spec("pallor_nail.json"),
 ]
 
 # ─── COLOR CONVERSION (correct sRGB -> CIE Lab) ────────────────────────
@@ -220,15 +258,37 @@ class LabTensor:
         return torch.from_numpy(lab.transpose(2, 0, 1)).float()
 
 
+class CaptureTransform:
+    """Match the camera transform declared in the exported model contract."""
+
+    def __init__(self, zoom: float, saturation: float, contrast: float) -> None:
+        self.zoom = zoom
+        self.saturation = saturation
+        self.contrast = contrast
+
+    def __call__(self, img: Image.Image) -> Image.Image:
+        if self.zoom > 1:
+            width, height = img.size
+            side = max(1, int(min(width, height) / self.zoom))
+            left = (width - side) // 2
+            top = (height - side) // 2
+            img = img.crop((left, top, left + side, top + side))
+        if self.saturation != 1:
+            img = ImageEnhance.Color(img).enhance(self.saturation)
+        if self.contrast != 1:
+            img = ImageEnhance.Contrast(img).enhance(self.contrast)
+        return img
+
+
 # ─── DATA PIPELINE ─────────────────────────────────────────────────────
 
 
-def build_transforms(image_size: int, train: bool = True) -> transforms.Compose:
-    steps: list = []
+def build_transforms(spec: ModelSpec, train: bool = True) -> transforms.Compose:
+    steps: list = [CaptureTransform(spec.capture_zoom, spec.capture_saturation, spec.capture_contrast)]
     if train:
         steps += [
-            transforms.Resize(image_size + 32),
-            transforms.RandomCrop(image_size),
+            transforms.Resize(spec.resize[0]),  # shorter side; preserves aspect ratio
+            transforms.RandomCrop(spec.image_size),
             transforms.RandomHorizontalFlip(),
             transforms.RandomRotation(15),
             # Kept mild on purpose: this task's signal IS a subtle color
@@ -238,10 +298,10 @@ def build_transforms(image_size: int, train: bool = True) -> transforms.Compose:
         ]
     else:
         steps += [
-            transforms.Resize(image_size + 32),
-            transforms.CenterCrop(image_size),
+            transforms.Resize(spec.resize[0]),  # must match backend's shorter-side resize
+            transforms.CenterCrop(spec.center_crop),
         ]
-    steps += [LabTensor(), transforms.Normalize(mean=LAB_MEAN, std=LAB_STD)]
+    steps += [LabTensor(), transforms.Normalize(mean=spec.mean, std=spec.std)]
     return transforms.Compose(steps)
 
 
@@ -253,14 +313,14 @@ class PallorDataset(Dataset):
     directory scans landed in the same order.
     """
 
-    def __init__(self, samples: list[tuple[str, int]], indices: list[int], transform):
+    def __init__(self, samples: list[tuple[str, int]], indices: list[int], transform, spec: ModelSpec):
         self.samples = samples
         self.indices = indices
         self.transform = transform
         # Defensive fallback -- should never be reached because
         # build_dataloaders() pre-filters corrupt files; this only guards
         # against a file going bad between the scan and an epoch.
-        self._fallback_img = Image.new("RGB", (IMAGE_SIZE + 32, IMAGE_SIZE + 32), (128, 128, 128))
+        self._fallback_img = Image.new("RGB", tuple(spec.resize), (128, 128, 128))
 
     def __len__(self) -> int:
         return len(self.indices)
@@ -348,7 +408,7 @@ def build_dataloaders(spec: ModelSpec):
         raise ValueError(f"{spec.test_id}: no readable images found under {data_dir}")
 
     n = len(samples)
-    train_idx, val_idx = stratified_split_indices(samples, VAL_SPLIT, SEED)
+    train_idx, val_idx = stratified_split_indices(samples, spec.val_split, SEED)
     train_n, val_n = len(train_idx), len(val_idx)
 
     def class_counts(indices: list[int]) -> str:
@@ -360,22 +420,22 @@ def build_dataloaders(spec: ModelSpec):
         spec.test_id, train_n, val_n, class_names, class_counts(train_idx), class_counts(val_idx),
     )
 
-    train_ds = PallorDataset(samples, train_idx, build_transforms(IMAGE_SIZE, train=True))
-    val_ds = PallorDataset(samples, val_idx, build_transforms(IMAGE_SIZE, train=False))
+    train_ds = PallorDataset(samples, train_idx, build_transforms(spec, train=True), spec)
+    val_ds = PallorDataset(samples, val_idx, build_transforms(spec, train=False), spec)
 
     class_weights = None
-    if CLASS_WEIGHTS == "balanced":
+    if spec.class_weights == "balanced":
         class_weights = compute_class_weights(samples, train_idx, len(class_names))
 
     pin = torch.cuda.is_available()
-    persistent = NUM_WORKERS > 0
+    persistent = spec.num_workers > 0
     train_loader = DataLoader(
-        train_ds, batch_size=BATCH_SIZE, shuffle=True,
-        num_workers=NUM_WORKERS, pin_memory=pin, persistent_workers=persistent,
+        train_ds, batch_size=spec.batch_size, shuffle=True,
+        num_workers=spec.num_workers, pin_memory=pin, persistent_workers=persistent,
     )
     val_loader = DataLoader(
-        val_ds, batch_size=BATCH_SIZE, shuffle=False,
-        num_workers=NUM_WORKERS, pin_memory=pin, persistent_workers=persistent,
+        val_ds, batch_size=spec.batch_size, shuffle=False,
+        num_workers=spec.num_workers, pin_memory=pin, persistent_workers=persistent,
     )
 
     return train_loader, val_loader, class_names, class_weights
@@ -459,7 +519,7 @@ def train_model(
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     use_amp = USE_AMP and device.type == "cuda"
-    model = build_model(BACKBONE, len(spec.class_labels), pretrained=PRETRAINED).to(device)
+    model = build_model(spec.backbone, len(spec.class_labels), pretrained=spec.pretrained).to(device)
     LOGGER.info("Using device: %s (amp=%s)", device, use_amp)
 
     if class_weights is not None:
@@ -474,30 +534,30 @@ def train_model(
     best_confusion = None
 
     # Freeze everything except the classifier head for the first
-    # FREEZE_BACKBONE_EPOCHS epochs.
+    # spec.freeze_backbone_epochs epochs.
     for name, param in model.named_parameters():
         param.requires_grad = "classifier" in name or name.startswith("fc")
 
     optimizer = optim.Adam(
         (p for p in model.parameters() if p.requires_grad),
-        lr=spec.learning_rate, weight_decay=WEIGHT_DECAY,
+        lr=spec.learning_rate, weight_decay=spec.weight_decay,
     )
     scheduler = None  # only meaningful once the backbone unfreezes (see below)
     scaler = torch.amp.GradScaler("cuda", enabled=use_amp)
 
-    LOGGER.info("Training %s (%s, %s, %d epochs)", spec.test_id, BACKBONE, COLOR_SPACE, spec.epochs)
+    LOGGER.info("Training %s (%s, %s, %d epochs)", spec.test_id, spec.backbone, spec.color_space, spec.epochs)
 
     for epoch in range(1, spec.epochs + 1):
         t0 = time.time()
 
-        if epoch == FREEZE_BACKBONE_EPOCHS + 1:
+        if epoch == spec.freeze_backbone_epochs + 1:
             LOGGER.info("  Unfreezing backbone at epoch %d", epoch)
             for param in model.parameters():
                 param.requires_grad = True
             optimizer = optim.Adam(
-                model.parameters(), lr=spec.learning_rate * LR_FINETUNE_FACTOR, weight_decay=WEIGHT_DECAY,
+                model.parameters(), lr=spec.learning_rate * spec.fine_tune_lr_factor, weight_decay=spec.weight_decay,
             )
-            remaining = max(1, spec.epochs - FREEZE_BACKBONE_EPOCHS)
+            remaining = max(1, spec.epochs - spec.freeze_backbone_epochs)
             scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=remaining)
 
         train_loss, train_acc = train_one_epoch(model, train_loader, criterion, optimizer, device, scaler, use_amp)
@@ -549,17 +609,23 @@ def _back_up_existing(output_dir: Path, keep: int = 5) -> None:
     LOGGER.info("Backed up previous model files in %s (stamp %s, keeping %d)", output_dir, stamp, keep)
 
 
-def export_model(spec: ModelSpec, checkpoint: Path, val_loader: DataLoader) -> None:
-    output_dir = DEFAULT_OUTPUT_ROOT / spec.test_id
+def export_model(
+    spec: ModelSpec,
+    checkpoint: Path,
+    val_loader: DataLoader,
+    best_val_acc: float,
+    output_root: Path = DEFAULT_OUTPUT_ROOT,
+) -> None:
+    output_dir = output_root / spec.test_id
     output_dir.mkdir(parents=True, exist_ok=True)
     _back_up_existing(output_dir)
 
-    model = build_model(BACKBONE, len(spec.class_labels), pretrained=False)
+    model = build_model(spec.backbone, len(spec.class_labels), pretrained=False)
     state_dict = torch.load(checkpoint, map_location="cpu", weights_only=True)
     model.load_state_dict(state_dict)
     model.eval()
 
-    example_input = torch.randn(1, 3, IMAGE_SIZE, IMAGE_SIZE)
+    example_input = torch.randn(1, 3, spec.image_size, spec.image_size)
     traced = torch.jit.trace(model, example_input)
 
     pt_path = output_dir / "model.pt"
@@ -570,25 +636,30 @@ def export_model(spec: ModelSpec, checkpoint: Path, val_loader: DataLoader) -> N
     contract = {
         "contract_version": 1,
         "test_id": spec.test_id,
-        "input_shape": [1, 3, IMAGE_SIZE, IMAGE_SIZE],
+        "input_shape": [1, 3, spec.image_size, spec.image_size],
         "preprocessing": {
-            "color_space": COLOR_SPACE,
+            "color_space": spec.color_space,
             "lab_conversion": (
                 "Standard sRGB->linear->XYZ(D65)->CIE Lab, NOT PIL's Image.convert('LAB'). "
                 "L in [0,100] -> divide by 100. a,b roughly in [-128,127] -> (val+128)/255, clipped to [0,1]."
             ),
-            "resize": [IMAGE_SIZE + 32, IMAGE_SIZE + 32],
-            "center_crop": IMAGE_SIZE,
-            "scale": [0.0, 1.0],
-            "mean": LAB_MEAN,
-            "std": LAB_STD,
+            "resize": spec.resize,
+            "center_crop": spec.center_crop,
+            "scale": spec.scale,
+            "mean": spec.mean,
+            "std": spec.std,
+            "capture": {
+                "center_zoom": spec.capture_zoom,
+                "saturation": spec.capture_saturation,
+                "contrast": spec.capture_contrast,
+            },
         },
         "output_class_labels": spec.class_labels,
-        "output_activation": "softmax",
+        "output_activation": spec.output_activation,
         "primary_score_key": spec.primary_score_key,
         "provenance": {
-            "architecture": BACKBONE,
-            "training_data": f"Fine-tuned from ImageNet pre-trained {BACKBONE} (CIELAB color space)",
+            "architecture": spec.backbone,
+            "training_data": f"Fine-tuned from ImageNet pre-trained {spec.backbone} (CIELAB color space)",
             "checkpoint": str(checkpoint.name),
         },
     }
@@ -624,6 +695,16 @@ def export_model(spec: ModelSpec, checkpoint: Path, val_loader: DataLoader) -> N
                     )
                 shown += take
     acc = correct / total if total else 0.0
+    contract["provenance"]["validation"] = {
+        "best_epoch_accuracy": round(best_val_acc, 6),
+        "exported_model_accuracy": round(acc, 6),
+        "sample_count": total,
+        "confusion_matrix": confusion.tolist(),
+        "class_order": spec.class_labels,
+    }
+    # Persist the metrics beside the exact TorchScript file that produced
+    # them. This makes a deployed model auditable without hunting logs.
+    json_path.write_text(json.dumps(contract, indent=2), encoding="utf-8")
     LOGGER.info("  Exported-model accuracy on real val data: %.3f (%d samples)", acc, total)
     LOGGER.info("  Exported-model confusion matrix (rows=true, cols=pred): %s\n%s", spec.class_labels, confusion)
 
@@ -643,8 +724,8 @@ def main() -> None:
         torch.backends.cudnn.benchmark = True  # fixed input size -> free speedup
         LOGGER.info("GPU: %s", torch.cuda.get_device_name(0))
     LOGGER.info("Device: %s", device)
-    LOGGER.info("Color space: %s (proper sRGB->Lab, see module docstring)", COLOR_SPACE)
-    LOGGER.info("Backbone: %s, pretrained=%s", BACKBONE, PRETRAINED)
+    LOGGER.info("Color space: Lab (proper sRGB->Lab, see module docstring)")
+    LOGGER.info("Loaded %d model configs from %s", len(MODELS), SCRIPT_DIR / "configs")
 
     specs: list[ModelSpec] = MODELS
     if smoke_mode:
@@ -662,7 +743,8 @@ def main() -> None:
             ckpt, val_acc = train_model(spec, train_loader, val_loader, class_names, class_weights)
 
             LOGGER.info("Exporting %s...", spec.test_id)
-            export_model(spec, ckpt, val_loader)
+            output_root = SMOKE_OUTPUT_ROOT if smoke_mode else DEFAULT_OUTPUT_ROOT
+            export_model(spec, ckpt, val_loader, val_acc, output_root)
 
             results.append((spec.test_id, val_acc, ckpt))
         except Exception:
@@ -675,7 +757,8 @@ def main() -> None:
     LOGGER.info("=" * 60)
     for test_id, val_acc, ckpt in results:
         LOGGER.info("  %s  val_acc=%.3f  checkpoint=%s", test_id, val_acc, ckpt)
-        LOGGER.info("  deployed -> %s", DEFAULT_OUTPUT_ROOT / test_id)
+        destination = SMOKE_OUTPUT_ROOT if smoke_mode else DEFAULT_OUTPUT_ROOT
+        LOGGER.info("  exported -> %s", destination / test_id)
     failed = {spec.test_id for spec in specs} - {r[0] for r in results}
     if failed:
         LOGGER.warning("  Did NOT complete: %s -- see errors above.", sorted(failed))

@@ -25,7 +25,7 @@ from typing import Any
 
 import numpy as np
 import torch
-from PIL import Image
+from PIL import Image, ImageEnhance
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 LOGGER = logging.getLogger(__name__)
@@ -94,6 +94,20 @@ def rgb_to_lab_tensor(image: Image.Image) -> torch.Tensor:
 def preprocess(image: Image.Image, metadata: dict[str, Any]) -> torch.Tensor:
     """Match backend _image_tensor: resize -> center crop -> Lab -> normalize."""
     preprocessing = metadata["preprocessing"]
+    capture = preprocessing.get("capture", {})
+    zoom = float(capture.get("center_zoom", 1.0))
+    if zoom > 1.0:
+        width, height = image.size
+        side = max(1, int(min(width, height) / zoom))
+        left = (width - side) // 2
+        top = (height - side) // 2
+        image = image.crop((left, top, left + side, top + side))
+    saturation = float(capture.get("saturation", 1.0))
+    contrast = float(capture.get("contrast", 1.0))
+    if saturation != 1.0:
+        image = ImageEnhance.Color(image).enhance(saturation)
+    if contrast != 1.0:
+        image = ImageEnhance.Contrast(image).enhance(contrast)
     shape = metadata["input_shape"]
     resize = preprocessing.get("resize", [shape[3], shape[2]])
     target_w, target_h = int(resize[0]), int(resize[1])
@@ -263,6 +277,7 @@ TEST_METADATA = {
         "scale": [0.0, 1.0],
         "mean": [0.5, 0.5, 0.5],
         "std": [0.5, 0.25, 0.25],
+        "capture": {"center_zoom": 2.2, "saturation": 1.12, "contrast": 1.03},
     },
 }
 
@@ -275,9 +290,10 @@ def run_check_lab() -> None:
     spec.loader.exec_module(mod)
 
     img = _sample_image("pallor_palm")
-    expected = mod.build_transforms(224, train=False)(img)  # normalized tensor
-    mean = torch.tensor(mod.LAB_MEAN).view(3, 1, 1)
-    std = torch.tensor(mod.LAB_STD).view(3, 1, 1)
+    pallor_spec = next(item for item in mod.MODELS if item.test_id == "pallor_palm")
+    expected = mod.build_transforms(pallor_spec, train=False)(img)  # normalized tensor
+    mean = torch.tensor(pallor_spec.mean).view(3, 1, 1)
+    std = torch.tensor(pallor_spec.std).view(3, 1, 1)
     expected_un = expected * std + mean  # back to [0, 1] Lab values
 
     actual = preprocess(img, TEST_METADATA)
