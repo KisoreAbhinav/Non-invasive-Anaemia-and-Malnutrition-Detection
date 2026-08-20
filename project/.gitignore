@@ -16,6 +16,9 @@ backend/models/vosk/*
 backend/models/piper/*
 !backend/models/piper/.gitkeep
 backend/models/sentence-transformers/
+
+# Ignore arbitrary vision checkpoints. Only the three reviewed TorchScript
+# inference bundles required by the offline application belong in Git.
 backend/models/vision/*/*
 !backend/models/vision/*/.gitkeep
 *.onnx
@@ -23,6 +26,34 @@ backend/models/vision/*/*
 *.pt
 *.pth
 *.tflite
+!backend/models/vision/pallor_eye/model.json
+!backend/models/vision/pallor_eye/model.pt
+!backend/models/vision/pallor_nail/model.json
+!backend/models/vision/pallor_nail/model.pt
+!backend/models/vision/pallor_palm/model.json
+!backend/models/vision/pallor_palm/model.pt
+
+# Never commit training data, experiment output, or extra checkpoints.
+backend/data/
+backend/datasets/
+backend/training-data/
+backend/training_data/
+backend/checkpoints/
+backend/runs/
+backend/wandb/
+backend/mlruns/
+*.csv
+*.tsv
+*.parquet
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.ckpt
+*.safetensors
 
 # Project-local uv state used when home-directory writes are unavailable.
 backend/.local-uv-cache/

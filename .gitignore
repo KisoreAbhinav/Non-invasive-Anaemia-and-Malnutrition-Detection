@@ -1,0 +1,73 @@
+# Operating-system and editor files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+
+# JavaScript dependencies and generated builds
+node_modules/
+dist/
+build/
+coverage/
+
+# Runtime output and local state
+*.log
+*.pid
+*.ses
+*.sqlite
+*.sqlite3
+*.db
+uploads/
+tmp/
+temp/
+
+# Training datasets, experiment output, and archives
+datasets/
+training-data/
+training_data/
+checkpoints/
+runs/
+wandb/
+mlruns/
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.arrow
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+*.h5
+*.hdf5
+*.ckpt
+*.safetensors
+*.zip
+*.tar
+*.tgz
+*.7z
+*.rar
