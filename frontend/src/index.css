@@ -226,6 +226,58 @@ h2, h3, p { overflow-wrap: anywhere; }
   display: block;
 }
 
+/* This filter is only a framing aid. Canvas capture always uses the raw video
+   frame, so the model receives the natural image it was trained to expect. */
+.pallor-preview {
+  filter: saturate(1.12) contrast(1.03);
+}
+
+.sub-slot-image.pallor-preview {
+  object-fit: contain;
+  background: #000;
+}
+
+.sub-slot-video.pallor-preview {
+  transform: scale(var(--pallor-preview-zoom, 2.2));
+  transform-origin: center;
+}
+
+.pallor-capture-guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  border: 2px solid #55db9c;
+  box-shadow: 0 0 0 999px rgba(0, 0, 0, 0.36);
+  color: #effff6;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 5px;
+  text-align: center;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.pallor-capture-guide span {
+  padding: 2px 4px;
+  background: rgba(0, 64, 35, 0.82);
+  font: 800 0.45rem ui-monospace, monospace;
+  letter-spacing: 0.08em;
+}
+
+.pallor-capture-guide small {
+  max-width: 94%;
+  margin-top: 3px;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.72);
+  font: 600 0.47rem Inter, sans-serif;
+  line-height: 1.2;
+}
+
 .sub-slot-retake-btn {
   position: absolute;
   top: 6px;

@@ -28,7 +28,12 @@
       0.5,
       0.25,
       0.25
-    ]
+    ],
+    "capture": {
+      "center_zoom": 2.2,
+      "saturation": 1.12,
+      "contrast": 1.03
+    }
   },
   "output_class_labels": [
     "normal",
@@ -39,6 +44,25 @@
   "provenance": {
     "architecture": "mobilenet_v3_large",
     "training_data": "Fine-tuned from ImageNet pre-trained mobilenet_v3_large (CIELAB color space)",
-    "checkpoint": "best.pt"
+    "checkpoint": "best.pt",
+    "validation": {
+      "best_epoch_accuracy": 0.56338,
+      "exported_model_accuracy": 0.556338,
+      "sample_count": 142,
+      "confusion_matrix": [
+        [
+          41,
+          16
+        ],
+        [
+          47,
+          38
+        ]
+      ],
+      "class_order": [
+        "normal",
+        "risk"
+      ]
+    }
   }
 }

@@ -18,6 +18,20 @@ const VAD = {
   maxTurnMs: 10000,
 };
 
+// The guide and the saved image must describe the exact same pixels.  This
+// crops the centre square digitally before upload, making the live framing
+// closer to the tight anatomical cut-outs used for training.
+const PALLOR_CAPTURE_ZOOM = {
+  pallor_eye: 1.35, // eye training images are already tight; avoid cutting out the conjunctiva
+  pallor_nail: 2.2,
+  pallor_palm: 2.2,
+};
+const PALLOR_CAPTURE_GUIDANCE = {
+  pallor_eye: "Fit the lower eyelid and pink conjunctiva inside the square",
+  pallor_nail: "Fit one bare nail bed inside the square",
+  pallor_palm: "Fit the centre of the palm inside the square",
+};
+
 async function readApiResponse(response) {
   const contentType = response.headers.get("content-type") ?? "";
   const body = contentType.includes("application/json")
@@ -119,6 +133,7 @@ function App() {
   const [capturedPreviewUrls, setCapturedPreviewUrls] = useState([]);
   const [activeSlot, setActiveSlot] = useState(0);  // which sub_capture slot is active
   const cameraStreamRef = useRef(null);
+  const cameraRequestRef = useRef(0);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   // Kept for non-sub_capture tests (single image)
@@ -139,6 +154,7 @@ function App() {
   useEffect(() => { stageRef.current = stage; }, [stage]);
 
   const closeCamera = useCallback(() => {
+    cameraRequestRef.current += 1;
     const stream = cameraStreamRef.current;
     if (stream) {
       stream.getTracks().forEach((track) => track.stop());
@@ -190,21 +206,32 @@ function App() {
   }, [activeSlot]);
 
   const startCamera = useCallback(async () => {
+    const requestId = cameraRequestRef.current + 1;
+    cameraRequestRef.current = requestId;
     try {
       let stream = cameraStreamRef.current;
       if (!stream || !stream.active) {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+          video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
           audio: false,
         });
+        // The user may have moved on while the permission dialog was open.
+        // Never attach that stale stream to a newly-rendered camera slot.
+        if (cameraRequestRef.current !== requestId) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
         cameraStreamRef.current = stream;
       }
       if (videoRef.current && videoRef.current.srcObject !== stream) {
         videoRef.current.srcObject = stream;
         videoRef.current.play().catch(() => {});
       }
+      setError("");
     } catch {
-      setError("Camera unavailable. Use file upload instead.");
+      if (cameraRequestRef.current === requestId) {
+        setError("Camera unavailable. Use file upload instead.");
+      }
     }
   }, []);
 
@@ -212,13 +239,19 @@ function App() {
   const captureToSlot = useCallback((slotIndex, closeAfter = false) => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-    // Crop to square from center
-    const vw = video.videoWidth || 640;
-    const vh = video.videoHeight || 480;
-    const size = Math.min(vw, vh);
-    const sx = (vw - size) / 2;
-    const sy = (vh - size) / 2;
+    if (!video || !canvas || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+      setError("Camera is still starting. Hold the guide steady, then capture.");
+      return;
+    }
+    // The saved frame remains a full centre square. The model contract applies
+    // the guide's site-specific zoom and mild colour enhancement in the backend, so
+    // uploads and camera frames use one identical inference path.
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    const zoom = 1;
+    const size = Math.floor(Math.min(vw, vh) / zoom);
+    const sx = Math.floor((vw - size) / 2);
+    const sy = Math.floor((vh - size) / 2);
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext("2d");
@@ -1331,6 +1364,7 @@ function App() {
                   const isFilled = !!capturedImages[idx];
                   const isActive = idx === activeSlot && !isFilled;
                   const isPending = !isFilled && !isActive;
+                  const captureZoom = PALLOR_CAPTURE_ZOOM[cap.id] ?? 2.2;
                   return (
                     <div
                       key={cap.id}
@@ -1347,7 +1381,7 @@ function App() {
                       <div className="sub-slot-body">
                         {isFilled ? (
                           <>
-                            <img src={capturedPreviewUrls[idx]} alt={cap.label} className="sub-slot-image" />
+                            <img src={capturedPreviewUrls[idx]} alt={cap.label} className="sub-slot-image pallor-preview" />
                             <button
                               className="sub-slot-retake-btn"
                               type="button"
@@ -1361,14 +1395,21 @@ function App() {
                             </button>
                           </>
                         ) : isActive ? (
-                          <video
-                            key={`active-video-${idx}`}
-                            ref={attachVideoStream}
-                            autoPlay
-                            playsInline
-                            muted
-                            className="sub-slot-video"
-                          />
+                          <>
+                            <video
+                              key={`active-video-${idx}`}
+                              ref={attachVideoStream}
+                              autoPlay
+                              playsInline
+                              muted
+                              className="sub-slot-video pallor-preview"
+                              style={{ "--pallor-preview-zoom": captureZoom }}
+                            />
+                            <div className="pallor-capture-guide" aria-hidden="true">
+                              <span>CAPTURE AREA</span>
+                              <small>{PALLOR_CAPTURE_GUIDANCE[cap.id] ?? "Keep the target area inside the square"}</small>
+                            </div>
+                          </>
                         ) : (
                           <div className="sub-slot-empty">
                             <span className="sub-slot-empty-num">0{idx + 1}</span>

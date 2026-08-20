@@ -6,7 +6,7 @@ from io import BytesIO
 from typing import Any
 
 import numpy as np
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageEnhance, UnidentifiedImageError
 
 from app.flows import model_registry
 
@@ -64,6 +64,27 @@ def _image_tensor(image_bytes: bytes, metadata: dict[str, Any]) -> Any:
     if len(shape) != 4 or shape[0] != 1 or shape[1] != 3:
         raise ValueError("only [1, 3, height, width] image models are supported")
     preprocessing = metadata["preprocessing"]
+    # New pallor contracts declare this camera transform.  It is intentionally
+    # contract-driven: older deployed models have no ``capture`` block and
+    # therefore retain their exact previous input path.
+    capture = preprocessing.get("capture", {})
+    zoom = float(capture.get("center_zoom", 1.0))
+    if zoom < 1.0:
+        raise ValueError("capture.center_zoom must be at least 1")
+    if zoom > 1.0:
+        width, height = image.size
+        side = max(1, int(min(width, height) / zoom))
+        left = (width - side) // 2
+        top = (height - side) // 2
+        image = image.crop((left, top, left + side, top + side))
+    saturation = float(capture.get("saturation", 1.0))
+    contrast = float(capture.get("contrast", 1.0))
+    if saturation <= 0 or contrast <= 0:
+        raise ValueError("capture saturation and contrast must be positive")
+    if saturation != 1.0:
+        image = ImageEnhance.Color(image).enhance(saturation)
+    if contrast != 1.0:
+        image = ImageEnhance.Contrast(image).enhance(contrast)
     resize = preprocessing.get("resize", [shape[3], shape[2]])
     if not isinstance(resize, list) or len(resize) != 2:
         raise ValueError("preprocessing.resize must be [width, height]")

@@ -62,6 +62,7 @@ Fixes vs. the previous version of this script (see chat for full detail):
 from __future__ import annotations
 
 import datetime
+import argparse
 import json
 import logging
 import shutil
@@ -713,8 +714,13 @@ def export_model(
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Train and export pallor models")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--smoke", action="store_true", help="2-epoch eye export to training/smoke_exports only")
+    mode.add_argument("--only", choices=[spec.test_id for spec in MODELS], help="train and deploy one model only")
+    args = parser.parse_args()
     SMOKE_EPOCHS = 2
-    smoke_mode = "--smoke" in sys.argv
+    smoke_mode = args.smoke
     if smoke_mode:
         LOGGER.info("SMOKE MODE: tiny pass (2 epochs, smallest dataset) + export sanity check.")
 
@@ -732,6 +738,9 @@ def main() -> None:
         # Pallor eye is the smallest dataset (710 images): fastest full pipeline check.
         specs = [replace(MODELS[1], epochs=SMOKE_EPOCHS)]
         LOGGER.info("Smoke-testing only: %s (%d epochs)", specs[0].test_id, SMOKE_EPOCHS)
+    elif args.only:
+        specs = [spec for spec in MODELS if spec.test_id == args.only]
+        LOGGER.info("Training only: %s", args.only)
 
     results: list[tuple[str, float, Path]] = []
     for spec in specs:

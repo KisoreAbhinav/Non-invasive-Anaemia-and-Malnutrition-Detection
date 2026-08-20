@@ -6,13 +6,13 @@
   "class_labels": ["normal", "risk"],
   "primary_score_key": "risk",
   "image_size": 224,
-  "epochs": 20,
+  "epochs": 30,
   "batch_size": 32,
   "num_workers": 4,
   "learning_rate": 1e-3,
-  "fine_tune_lr_factor": 0.03,
+  "fine_tune_lr_factor": 0.1,
   "weight_decay": 1e-4,
-  "freeze_backbone_epochs": 5,
+  "freeze_backbone_epochs": 3,
   "val_split": 0.20,
   "class_weights": "balanced",
   "color_space": "Lab",
@@ -25,6 +25,6 @@
     "scale": [0.0, 1.0],
     "mean": [0.5, 0.5, 0.5],
     "std": [0.5, 0.25, 0.25],
-    "capture": {"center_zoom": 2.2, "saturation": 1.12, "contrast": 1.03}
+    "capture": {"center_zoom": 1.35, "saturation": 1.12, "contrast": 1.03}
   }
 }
