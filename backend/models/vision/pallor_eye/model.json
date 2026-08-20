@@ -1,0 +1,43 @@
+{
+  "contract_version": 1,
+  "test_id": "pallor_eye",
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "preprocessing": {
+    "color_space": "RGB",
+    "resize": [
+      256,
+      256
+    ],
+    "center_crop": 224,
+    "scale": [
+      0.0,
+      1.0
+    ],
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "output_class_labels": [
+    "normal",
+    "risk"
+  ],
+  "output_activation": "softmax",
+  "primary_score_key": "risk",
+  "provenance": {
+    "architecture": "mobilenet_v3_small",
+    "training_data": "Fine-tuned from ImageNet pre-trained mobilenet_v3_small",
+    "checkpoint": "best.pt"
+  }
+}

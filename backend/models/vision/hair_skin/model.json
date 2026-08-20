@@ -1,0 +1,41 @@
+{
+  "contract_version": 1,
+  "test_id": "hair_skin",
+  "input_shape": [
+    1,
+    3,
+    224,
+    224
+  ],
+  "preprocessing": {
+    "color_space": "RGB",
+    "resize": [
+      224,
+      224
+    ],
+    "scale": [
+      0.0,
+      1.0
+    ],
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "output_class_labels": [
+    "normal",
+    "signs_detected"
+  ],
+  "output_activation": "softmax",
+  "primary_score_key": "signs_detected",
+  "provenance": {
+    "architecture": "efficientnet_b0",
+    "training_data": "ImageNet pre-trained (replace with domain-fine-tuned checkpoint)"
+  }
+}

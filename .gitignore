@@ -16,12 +16,8 @@ backend/models/vosk/*
 backend/models/piper/*
 !backend/models/piper/.gitkeep
 backend/models/sentence-transformers/
-backend/models/vision/*/*
-!backend/models/vision/*/.gitkeep
 *.onnx
 *.onnx.json
-*.pt
-*.pth
 *.tflite
 
 # Project-local uv state used when home-directory writes are unavailable.
