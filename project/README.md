@@ -34,6 +34,8 @@ repository's `References.md` section 10.
 
 - Python version is pinned with `backend/.python-version` to **3.13.5**
 - Backend dependency management uses **uv** via `backend/pyproject.toml`
+- The three vision weights use **Git LFS**; after installing Git LFS, run
+  `git lfs install && git lfs pull` once from the repository root
 
 Local backend run:
 
@@ -215,8 +217,9 @@ without speech inference, temporarily change both values to `mock`.
 
 Large speech assets remain excluded from Git. A clean Docker build downloads
 the Indian-English Vosk model, Piper voice, and semantic matcher into the
-container image. The three trained pallor artifacts are committed; other vision
-tests remain optional drop-ins and unavailable tests are reported honestly.
+container image. The three trained pallor artifacts are versioned through Git
+LFS; other vision tests remain optional drop-ins and unavailable tests are
+reported honestly.
 
 - Frontend: `http://localhost:8080`
 - Backend health: `http://localhost:8000/api/health`

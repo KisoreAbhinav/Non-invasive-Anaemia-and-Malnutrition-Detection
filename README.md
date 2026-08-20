@@ -6,6 +6,10 @@ pregnant women, and other adults.
 The runnable application is in [`project/`](project/). The separate
 `Simulation Demo/` is retained as an unrelated edema simulation.
 
+The three runtime vision weights are tracked with Git LFS. Install Git LFS
+before cloning, or run `git lfs install && git lfs pull` in an existing clone,
+so the application receives the model files rather than pointer files.
+
 ```bash
 cd project
 docker compose up --build
