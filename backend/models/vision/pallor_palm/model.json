@@ -9,10 +9,12 @@
   ],
   "preprocessing": {
     "color_space": "Lab",
+    "lab_conversion": "Standard sRGB->linear->XYZ(D65)->CIE Lab, NOT PIL's Image.convert('LAB'). L in [0,100] -> divide by 100. a,b roughly in [-128,127] -> (val+128)/255, clipped to [0,1].",
     "resize": [
-      224,
-      224
+      256,
+      256
     ],
+    "center_crop": 224,
     "scale": [
       0.0,
       1.0
@@ -35,8 +37,8 @@
   "output_activation": "softmax",
   "primary_score_key": "risk",
   "provenance": {
-    "architecture": "mobilenet_v3_small",
-    "training_data": "Fine-tuned from ImageNet pre-trained mobilenet_v3_small (CIELAB color space)",
+    "architecture": "mobilenet_v3_large",
+    "training_data": "Fine-tuned from ImageNet pre-trained mobilenet_v3_large (CIELAB color space)",
     "checkpoint": "best.pt"
   }
 }

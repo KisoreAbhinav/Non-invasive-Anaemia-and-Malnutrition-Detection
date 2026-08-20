@@ -1,3 +1,75 @@
+# Gradio Pallor Checker Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** A single-page Gradio app in `training/` that classifies uploaded palm/eye/nail images with the deployed pallor models (badge + confidence + model path per card).
+
+**Architecture:** One standalone script `training/gradio_app.py`. It loads `model.pt` + `model.json` from each `backend/models/vision/<test_id>/` directory once at startup, applies contract-driven preprocessing (resize 256 → center crop 224 → numpy sRGB→Lab → normalize) identical to the backend, and exposes three independent cards via `gr.Blocks`. Includes `--smoke` (headless one-shot prediction per site) and `--check-lab` (numeric parity vs `train_all_v2.py`'s `LabTensor`).
+
+**Tech Stack:** Python 3.13, gradio (new dep, training venv), torch 2.6.0+cu124, numpy, Pillow. No backend code changes.
+
+---
+
+## File Structure
+
+- `training/gradio_app.py` — the entire app (model loading, preprocessing, predict, UI, smoke/check modes).
+- `training/requirements.txt` — append `gradio>=6`.
+
+---
+
+### Task 1: Install gradio into the training venv
+
+**Files:**
+- Modify: `training/requirements.txt`
+
+- [ ] **Step 1: Install gradio**
+
+Run (from repo root):
+
+```bash
+& C:\Users\neved\Projects\Non-invasive-Anaemia-and-Malnutrition-Detection\training\.venv\Scripts\python.exe -m pip install gradio
+```
+
+Expected: pip resolves and installs gradio + deps (fastapi, pydantic, httpx, etc.). No output failure.
+
+- [ ] **Step 2: Verify import works on Python 3.13**
+
+Run:
+
+```bash
+& .venv\Scripts\python.exe -c "import gradio; print(gradio.__version__)"
+```
+
+Expected: prints a version (e.g. `6.x.x` or `5.x.x`). No ImportError.
+If Python 3.13 incompatible wheels fail to resolve, fall back to `pip install "gradio<6"` and re-verify.
+
+- [ ] **Step 3: Record the dependency**
+
+Append to `training/requirements.txt` (keep the pinned style):
+
+```
+gradio>=6
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add training/requirements.txt
+git commit -m "chore: add gradio dependency for pallor checker UI"
+```
+
+---
+
+### Task 2: Create `training/gradio_app.py`
+
+**Files:**
+- Create: `training/gradio_app.py`
+
+- [ ] **Step 1: Write the full application**
+
+Write the complete file below to `training/gradio_app.py`:
+
+```python
 #!/usr/bin/env python3
 """Gradio UI for the three deployed pallor models (palm, eye, nail).
 
@@ -14,8 +86,6 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import html
 import importlib.util
 import json
 import logging
@@ -44,6 +114,10 @@ DATA_DIRS = {
     "pallor_eye": "data/pallor_eye",
     "pallor_nail": "data/pallor_fingernail",
 }
+
+PORT = 7860
+if "--port" in sys.argv:
+    PORT = int(sys.argv[sys.argv.index("--port") + 1])
 
 # ─── CIE Lab conversion ────────────────────────────────────────────────
 # Identical math to backend/app/flows/vision_inference.py and
@@ -154,7 +228,7 @@ class ModelEntry:
             self.metadata = metadata
             self.model = torch.jit.load(str(pt), map_location="cpu")
             self.model.eval()
-        except Exception as exc:  # noqa: BLE001 - malformed contract degrades this card only
+        except (OSError, json.JSONDecodeError, RuntimeError) as exc:
             self.error = f"load failed: {exc}"
 
     @property
@@ -176,35 +250,21 @@ def load_models() -> dict[str, ModelEntry]:
 
 # ─── Prediction ────────────────────────────────────────────────────────
 
-def predict(entry: ModelEntry, image: Image.Image | str | Path) -> tuple[str, float, str | None]:
+def predict(entry: ModelEntry, image: Image.Image) -> tuple[str, float, str | None]:
     """Return (badge_label, risk_probability, error_message).
 
-    Image may be a PIL image or an on-disk path (gradio type="filepath" or
-    smoke-test samples). Badge label is the argmax class ("RISK 88%" /
-    "NORMAL 62%"); the number shown is always the primary score key's
-    probability (risk).
+    Badge label is the argmax class ("RISK 88%" / "NORMAL 62%"); the number
+    shown is always the primary score key's probability (risk).
     """
     if entry.error:
         return "MODEL UNAVAILABLE", 0.0, entry.error
     try:
-        if not isinstance(image, Image.Image):
-            image = Image.open(image).convert("RGB")
         tensor = preprocess(image, entry.metadata)
         with torch.inference_mode():
             output = entry.model(tensor)
         values = output.detach().cpu().reshape(-1)
         labels = entry.metadata["output_class_labels"]
-        if len(labels) != len(values):
-            raise ValueError("model output size does not match output_class_labels")
-        activation = entry.metadata.get("output_activation", "softmax")
-        if activation == "softmax":
-            probs = torch.softmax(values, dim=0)
-        elif activation == "sigmoid":
-            probs = torch.sigmoid(values)
-        elif activation != "none":
-            raise ValueError("output_activation must be softmax, sigmoid, or none")
-        else:
-            probs = values
+        probs = torch.softmax(values, dim=0)
         scores = {label: float(v) for label, v in zip(labels, probs.tolist())}
         primary_key = entry.metadata.get("primary_score_key", labels[-1])
         risk_prob = scores[primary_key]
@@ -217,14 +277,9 @@ def predict(entry: ModelEntry, image: Image.Image | str | Path) -> tuple[str, fl
 
 # ─── Verification modes ────────────────────────────────────────────────
 
-_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tif", ".tiff"}
-
-
 def _sample_image(test_id: str) -> Image.Image:
     data_dir = SCRIPT_DIR / DATA_DIRS[test_id]
-    candidates = sorted(
-        p for p in data_dir.rglob("*") if p.is_file() and p.suffix.lower() in _IMAGE_EXTS
-    )
+    candidates = sorted(p for p in data_dir.rglob("*") if p.is_file())
     if not candidates:
         raise FileNotFoundError(f"No images found under {data_dir}")
     return Image.open(candidates[0]).convert("RGB")
@@ -281,8 +336,7 @@ def run_check_lab() -> None:
     expected_un = expected * std + mean  # back to [0, 1] Lab values
 
     actual = preprocess(img, TEST_METADATA)
-    actual_un = actual * std + mean  # back to [0, 1] Lab values
-    diff = (actual_un - expected_un).abs().max().item()
+    diff = (actual - expected_un).abs().max().item()
     LOGGER.info("Lab parity max abs diff: %.3e (threshold 1e-4)", diff)
     if diff >= 1e-4:
         LOGGER.error("CHECK-LAB FAILED: preprocessing drifted from training")
@@ -292,7 +346,7 @@ def run_check_lab() -> None:
 
 # ─── UI ────────────────────────────────────────────────────────────────
 
-def build_ui(entries: dict[str, ModelEntry], port: int = 7860) -> None:
+def build_ui(entries: dict[str, ModelEntry]) -> None:
     import gradio as gr
 
     def make_handler(test_id: str):
@@ -301,11 +355,10 @@ def build_ui(entries: dict[str, ModelEntry], port: int = 7860) -> None:
             path_md = f"**model:** `{entry.model_path}`" if not entry.error else "**model:** not installed"
             if img is None:
                 return "<span style='color:#888'>Awaiting upload</span>", path_md
-            label, risk_prob, err = predict(entry, img)
+            label, risk, err = predict(entry, img)
             if err:
-                return f"<span style='color:#c0392b'>Error: {html.escape(err)}</span>", path_md
-            # Threshold on the primary score key (risk) probability.
-            color = "#c0392b" if risk_prob >= 0.5 else "#1a7f37"
+                return f"<span style='color:#c0392b'>Error: {err}</span>", path_md
+            color = "#c0392b" if risk >= 0.5 else "#1a7f37"
             return (
                 f"<span style='color:{color};font-weight:bold;font-size:1.5em'>{label}</span>",
                 path_md,
@@ -318,33 +371,78 @@ def build_ui(entries: dict[str, ModelEntry], port: int = 7860) -> None:
             for test_id in MODEL_IDS:
                 with gr.Column():
                     gr.Markdown(f"## {SITE_TITLES[test_id]}")
-                    # type="filepath": corrupt uploads reach the handler as a path and
-                    # fail inside predict() at Image.open(), surfacing as the per-card
-                    # red error instead of a gradio-side decode failure.
-                    img_in = gr.Image(type="filepath", label="Upload image", height=280)
+                    img_in = gr.Image(type="pil", label="Upload image", height=280)
                     out_badge = gr.HTML("<span style='color:#888'>Awaiting upload</span>")
                     out_path = gr.Markdown()
                     img_in.change(make_handler(test_id), img_in, [out_badge, out_path])
-    demo.launch(server_name="127.0.0.1", server_port=port)
+    demo.launch(server_name="127.0.0.1", server_port=PORT)
 
 
-def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Launch the Pallor Checker gradio UI")
-    parser.add_argument("--port", type=int, default=7860, help="UI port (default: 7860)")
-    parser.add_argument("--smoke", action="store_true", help="headless: one prediction per site")
-    parser.add_argument("--check-lab", action="store_true", help="numeric parity vs train_all_v2 LabTensor")
-    return parser.parse_args(argv)
-
-
-def main(argv: list[str] | None = None) -> None:
-    args = parse_args(argv)
-    if args.smoke:
-        run_smoke(load_models())
-    elif args.check_lab:
+def main() -> None:
+    entries = load_models()
+    if "--smoke" in sys.argv:
+        run_smoke(entries)
+    elif "--check-lab" in sys.argv:
         run_check_lab()
     else:
-        build_ui(load_models(), args.port)
+        build_ui(entries)
 
 
 if __name__ == "__main__":
     main()
+```
+
+- [ ] **Step 2: Verify it compiles**
+
+Run: `& .venv\Scripts\python.exe -m py_compile training\gradio_app.py`
+Expected: exit 0, no output.
+
+- [ ] **Step 3: Run the Lab parity check**
+
+Run: `& .venv\Scripts\python.exe training\gradio_app.py --check-lab`
+Expected: `CHECK-LAB PASSED` with `max abs diff` on the order of `1e-8` (well under `1e-4`). If it fails, the preprocessing in `preprocess()` drifted from `train_all_v2.py` — fix before proceeding.
+
+- [ ] **Step 4: Run the smoke check**
+
+Run: `& .venv\Scripts\python.exe training\gradio_app.py --smoke`
+Expected: three lines like `SMOKE pallor_palm -> ... (risk=0.xxx) [(w, h)]` followed by `SMOKE PASSED`, exit 0. Also confirm the startup log shows `Loaded pallor_eye from ...` for all three models (no "unavailable" warnings).
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add training/gradio_app.py
+git commit -m "feat: standalone gradio pallor checker UI"
+```
+
+---
+
+### Task 3: Manual UI verification
+
+**Files:** none (runtime check).
+
+- [ ] **Step 1: Launch the app**
+
+Run: `& .venv\Scripts\python.exe training\gradio_app.py`
+Expected: logs show all three models loaded, then `Running on local URL: http://127.0.0.1:7860`.
+
+- [ ] **Step 2: Verify each card in the browser**
+
+Open `http://127.0.0.1:7860`. For each card (Palm, Eye, Nail) upload a real image (use one from `training/data/pallor_palm/risk`, `training/data/pallor_eye/risk`, `training/data/pallor_fingernail/risk`).
+Expected: the card shows a colored badge (e.g. `RISK 88%`) and a `model:` line with the deployed `model.pt` path. Results compute within a couple seconds (CPU inference).
+
+- [ ] **Step 3: Verify error isolation**
+
+Upload a corrupt/non-image file (e.g. rename a `.txt` to `.jpg`) to one card.
+Expected: that card shows a red `Error: ...` box; the other two cards remain fully functional.
+
+- [ ] **Step 4: Stop the app**
+
+Ctrl+C in the terminal that launched it. Expected: clean shutdown, no traceback.
+
+---
+
+## Self-Review Notes (checked)
+
+- **Spec coverage:** standalone script (Task 2) ✓; contract-driven preprocessing (Task 2 `preprocess`) ✓; three separate cards (Task 2 `build_ui`) ✓; badge + confidence + model path (Task 2 `make_handler`) ✓; startup-only loading (Task 2 `load_models`) ✓; per-card error isolation (Task 2 `predict` try/except + `handler`) ✓; `--smoke` (Task 2 `run_smoke`) ✓; Lab parity test (Task 2 `run_check_lab`) ✓; gradio install + requirements pin (Task 1) ✓; manual browser check (Task 3) ✓.
+- **Types consistent:** `predict()` returns `(str, float, str | None)` everywhere; `ModelEntry.error` used in both `predict` and `make_handler`; `preprocess(image, metadata)` same signature in `predict` and `run_check_lab`.
+- **No placeholders:** all code is complete; verification commands have explicit expected output.
