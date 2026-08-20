@@ -32,8 +32,7 @@ DEFAULT_OUTPUT_ROOT = SCRIPT_DIR.parent / "backend" / "models" / "vision"
 
 PREPROCESSING = {
     "color_space": "Lab",
-    "resize": [256, 256],
-    "center_crop": 224,
+    "resize": [224, 224],
     "scale": [0.0, 1.0],
     "mean": [0.5, 0.5, 0.5],
     "std": [0.5, 0.25, 0.25],
@@ -79,7 +78,6 @@ def export(
         "input_shape": [1, 3, image_size, image_size],
         "preprocessing": {
             **PREPROCESSING,
-            "center_crop": image_size,
         },
         "output_class_labels": class_labels,
         "output_activation": output_activation,

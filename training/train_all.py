@@ -58,6 +58,10 @@ SEED = 42
 LAB_MEAN = [0.5, 0.5, 0.5]
 LAB_STD = [0.5, 0.25, 0.25]
 
+
+def to_lab(img):
+    return img.convert("LAB")
+
 # ─── MODEL DEFINITIONS ─────────────────────────────────────────────────
 
 @dataclass
@@ -103,18 +107,17 @@ def build_transforms(image_size: int, train: bool = True) -> transforms.Compose:
     steps = []
     if train:
         steps += [
-            transforms.Resize(image_size + 32),
-            transforms.RandomCrop(image_size),
+            transforms.Resize((image_size, image_size)),
             transforms.RandomHorizontalFlip(),
             transforms.RandomRotation(15),
+            transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
             transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-            transforms.Lambda(lambda img: img.convert("LAB")),
+            transforms.Lambda(to_lab),
         ]
     else:
         steps += [
-            transforms.Resize(image_size + 32),
-            transforms.CenterCrop(image_size),
-            transforms.Lambda(lambda img: img.convert("LAB")),
+            transforms.Resize((image_size, image_size)),
+            transforms.Lambda(to_lab),
         ]
     steps += [
         transforms.ToTensor(),
@@ -329,8 +332,7 @@ def export_model(spec: ModelSpec, checkpoint: Path) -> None:
         "input_shape": [1, 3, IMAGE_SIZE, IMAGE_SIZE],
         "preprocessing": {
             "color_space": COLOR_SPACE,
-            "resize": [256, 256],
-            "center_crop": IMAGE_SIZE,
+            "resize": [IMAGE_SIZE, IMAGE_SIZE],
             "scale": [0.0, 1.0],
             "mean": LAB_MEAN,
             "std": LAB_STD,
