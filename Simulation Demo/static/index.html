@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Demo - Pitting Edema Detection</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="masthead">
+        <div class="brand-mark">+</div>
+        <div><p class="eyebrow">Demo</p><h1>Pitting Edema Detection</h1></div>
+        <span id="modeBadge" class="status-badge">Normal tissue</span>
+      </header>
+      <section class="workspace">
+        <aside class="control-panel">
+          <p class="eyebrow">1 · Patient setup</p>
+          <h2>Generate a case</h2>
+          <label for="mode">Tissue mode</label>
+          <select id="mode"><option value="normal">Normal tissue</option><option value="edema">Edema tissue</option></select>
+          <label for="force">Force <output id="forceValue">7.0</output></label>
+          <input id="force" type="range" min="1" max="16" value="7" step="0.5" />
+          <label for="duration">Press duration <output id="durationValue">3.0 s</output></label>
+          <input id="duration" type="range" min="0.5" max="12" value="3" step="0.5" />
+          <button id="generateButton" class="button primary">Generate synthetic patient</button>
+          <div id="patientCard" class="patient-card empty"><span>No patient generated</span><small>Choose a tissue mode, then generate.</small></div>
+        </aside>
+        <section class="simulation-panel">
+          <div class="panel-heading"><div><p class="eyebrow">2 · Simulation</p><h2 id="simulationTitle">Generate a patient to begin</h2></div><span id="pressDetails" class="press-details">—</span></div>
+          <div class="fabric-wrap"><canvas id="fabric" width="760" height="440" aria-label="Deformable fabric simulation"></canvas><div id="meshHint">Press point</div></div>
+          <div class="metrics">
+            <article class="metric"><span>Displacement</span><strong id="currentDepth">0.000</strong><small>visual units</small></article>
+            <article class="metric"><span>Vision model status</span><strong id="visionStatus">Looking for pit</strong><small id="visionStatusReason">Awaiting simulation</small></article>
+            <article class="metric"><span>90% recovery</span><strong id="recoveryTime">—</strong><small>after release</small></article>
+            <article class="metric"><span>Curve verdict</span><strong id="deterministicVerdict">—</strong><small id="deterministicReason">Awaiting case</small></article>
+          </div>
+          <div class="graph-card"><div class="graph-title"><h3>Press and recovery curve</h3><span id="releaseTime">—</span></div><canvas id="graph" width="1060" height="230"></canvas></div>
+        </section>
+      </section>
+      <section id="patientDataset" class="patient-dataset empty">
+        <div class="dataset-heading"><p class="eyebrow">Generated patient data</p><h2>Generate a patient to view their values</h2></div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

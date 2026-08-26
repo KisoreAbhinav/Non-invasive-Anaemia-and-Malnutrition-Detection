@@ -1,0 +1,39 @@
+[project]
+name = "screening-backend"
+version = "0.1.0"
+description = "Hackathon backend scaffold for independent screening flows"
+requires-python = "==3.13.5"
+dependencies = [
+    "anyio==4.9.0",
+    "fastapi==0.116.1",
+    "numpy>=2.0.0",
+    "pillow>=11.0.0",
+    "piper-tts>=1.7.0",
+    "python-multipart>=0.0.18",
+    "rapidfuzz>=3.14.5",
+    "sentence-transformers>=6.0.0",
+    "torch>=2.11.0",
+    "uvicorn[standard]==0.35.0",
+    "vosk>=0.3.45",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==8.4.1",
+    "httpx==0.28.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+# Sentence-transformers only needs CPU inference on the Raspberry Pi. Pinning
+# torch to the official CPU index avoids shipping several gigabytes of unused
+# CUDA runtime libraries in the backend image.
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true

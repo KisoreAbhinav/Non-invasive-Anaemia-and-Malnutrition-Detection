@@ -1,0 +1,20 @@
+[project]
+name = "pitting-edema-simulation-demo"
+version = "0.1.0"
+description = "Standalone synthetic pitting-edema physics and vision-classifier demo"
+requires-python = ">=3.11"
+dependencies = ["fastapi>=0.115,<1", "uvicorn[standard]>=0.30,<1"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["app"]
+
+[dependency-groups]
+dev = ["pytest>=8,<9", "httpx>=0.27,<1"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

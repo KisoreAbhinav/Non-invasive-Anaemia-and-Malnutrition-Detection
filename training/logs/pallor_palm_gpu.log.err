@@ -1,0 +1,45 @@
+2026-08-20 01:11:55,953 INFO Dataset: 3621 train, 639 val, 2 classes: ['normal', 'risk']
+2026-08-20 01:11:56,888 INFO Using device: cuda
+2026-08-20 01:12:14,738 INFO Class weights: [1.2512093782424927, 0.8327966928482056]
+2026-08-20 01:12:14,741 INFO Starting training: pallor_palm (mobilenet_v3_small) for 25 epochs
+2026-08-20 01:12:14,743 INFO Backbone frozen for first 5 epochs
+2026-08-20 01:12:34,979 INFO Epoch   1/25  train_loss=0.6180  train_acc=0.665  val_loss=0.9720  val_acc=0.585  lr=3.0e-03  20.2s
+2026-08-20 01:12:35,016 INFO   → Saved best model (val_acc=0.585)
+2026-08-20 01:12:42,715 INFO Epoch   2/25  train_loss=0.5194  train_acc=0.748  val_loss=2.1320  val_acc=0.624  lr=3.0e-03  7.7s
+2026-08-20 01:12:42,746 INFO   → Saved best model (val_acc=0.624)
+2026-08-20 01:12:50,322 INFO Epoch   3/25  train_loss=0.4558  train_acc=0.785  val_loss=1.0013  val_acc=0.739  lr=3.0e-03  7.6s
+2026-08-20 01:12:50,361 INFO   → Saved best model (val_acc=0.739)
+2026-08-20 01:12:57,959 INFO Epoch   4/25  train_loss=0.4281  train_acc=0.801  val_loss=0.3506  val_acc=0.853  lr=3.0e-03  7.6s
+2026-08-20 01:12:57,994 INFO   → Saved best model (val_acc=0.853)
+2026-08-20 01:13:05,431 INFO Epoch   5/25  train_loss=0.3707  train_acc=0.832  val_loss=0.3202  val_acc=0.864  lr=3.0e-03  7.4s
+2026-08-20 01:13:05,465 INFO   → Saved best model (val_acc=0.864)
+2026-08-20 01:13:05,466 INFO Backbone unfrozen at epoch 6
+2026-08-20 01:13:12,876 INFO Epoch   6/25  train_loss=0.2517  train_acc=0.893  val_loss=0.2292  val_acc=0.900  lr=3.0e-04  7.4s
+2026-08-20 01:13:12,915 INFO   → Saved best model (val_acc=0.900)
+2026-08-20 01:13:20,784 INFO Epoch   7/25  train_loss=0.2215  train_acc=0.911  val_loss=0.1992  val_acc=0.923  lr=3.0e-04  7.9s
+2026-08-20 01:13:20,825 INFO   → Saved best model (val_acc=0.923)
+2026-08-20 01:13:29,191 INFO Epoch   8/25  train_loss=0.1678  train_acc=0.934  val_loss=0.2730  val_acc=0.915  lr=3.0e-04  8.4s
+2026-08-20 01:13:36,870 INFO Epoch   9/25  train_loss=0.1452  train_acc=0.941  val_loss=0.1097  val_acc=0.951  lr=3.0e-04  7.7s
+2026-08-20 01:13:36,906 INFO   → Saved best model (val_acc=0.951)
+2026-08-20 01:13:44,561 INFO Epoch  10/25  train_loss=0.1522  train_acc=0.944  val_loss=0.1524  val_acc=0.928  lr=3.0e-04  7.7s
+2026-08-20 01:13:52,726 INFO Epoch  11/25  train_loss=0.1349  train_acc=0.949  val_loss=0.1465  val_acc=0.936  lr=3.0e-04  8.2s
+2026-08-20 01:14:00,897 INFO Epoch  12/25  train_loss=0.1299  train_acc=0.950  val_loss=0.0898  val_acc=0.955  lr=3.0e-04  8.2s
+2026-08-20 01:14:00,934 INFO   → Saved best model (val_acc=0.955)
+2026-08-20 01:14:08,647 INFO Epoch  13/25  train_loss=0.0991  train_acc=0.961  val_loss=0.1055  val_acc=0.967  lr=3.0e-04  7.7s
+2026-08-20 01:14:08,682 INFO   → Saved best model (val_acc=0.967)
+2026-08-20 01:14:17,001 INFO Epoch  14/25  train_loss=0.0974  train_acc=0.961  val_loss=0.1198  val_acc=0.948  lr=3.0e-04  8.3s
+2026-08-20 01:14:24,580 INFO Epoch  15/25  train_loss=0.0926  train_acc=0.964  val_loss=0.0613  val_acc=0.978  lr=3.0e-04  7.6s
+2026-08-20 01:14:24,615 INFO   → Saved best model (val_acc=0.978)
+2026-08-20 01:14:32,650 INFO Epoch  16/25  train_loss=0.0774  train_acc=0.972  val_loss=0.0930  val_acc=0.973  lr=3.0e-04  8.0s
+2026-08-20 01:14:40,798 INFO Epoch  17/25  train_loss=0.0885  train_acc=0.969  val_loss=0.1337  val_acc=0.942  lr=3.0e-04  8.1s
+2026-08-20 01:14:49,315 INFO Epoch  18/25  train_loss=0.0833  train_acc=0.970  val_loss=0.0642  val_acc=0.975  lr=3.0e-04  8.5s
+2026-08-20 01:14:57,372 INFO Epoch  19/25  train_loss=0.0739  train_acc=0.978  val_loss=0.0973  val_acc=0.969  lr=3.0e-04  8.1s
+2026-08-20 01:15:05,668 INFO Epoch  20/25  train_loss=0.0703  train_acc=0.973  val_loss=0.0530  val_acc=0.980  lr=3.0e-04  8.3s
+2026-08-20 01:15:05,711 INFO   → Saved best model (val_acc=0.980)
+2026-08-20 01:15:13,629 INFO Epoch  21/25  train_loss=0.0622  train_acc=0.976  val_loss=0.0853  val_acc=0.964  lr=3.0e-04  7.9s
+2026-08-20 01:15:21,718 INFO Epoch  22/25  train_loss=0.0665  train_acc=0.975  val_loss=0.0452  val_acc=0.981  lr=3.0e-04  8.1s
+2026-08-20 01:15:21,755 INFO   → Saved best model (val_acc=0.981)
+2026-08-20 01:15:29,758 INFO Epoch  23/25  train_loss=0.0594  train_acc=0.980  val_loss=0.0919  val_acc=0.975  lr=3.0e-04  8.0s
+2026-08-20 01:15:37,867 INFO Epoch  24/25  train_loss=0.0573  train_acc=0.981  val_loss=0.0905  val_acc=0.964  lr=3.0e-04  8.1s
+2026-08-20 01:15:46,761 INFO Epoch  25/25  train_loss=0.0525  train_acc=0.979  val_loss=0.0489  val_acc=0.981  lr=3.0e-04  8.9s
+2026-08-20 01:15:46,763 INFO Training complete. Best val_acc=0.981  Saved to C:\Users\neved\Projects\Non-invasive-Anaemia-and-Malnutrition-Detection\training\checkpoints\pallor_palm\best.pt

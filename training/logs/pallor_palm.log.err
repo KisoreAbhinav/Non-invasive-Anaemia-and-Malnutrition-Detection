@@ -1,0 +1,26 @@
+2026-08-20 00:16:34,912 INFO Dataset: 3621 train, 639 val, 2 classes: ['normal', 'risk']
+C:\Users\neved\Projects\Non-invasive-Anaemia-and-Malnutrition-Detection\backend\.venv\Lib\site-packages\torch\utils\data\dataloader.py:759: UserWarning: 'pin_memory' argument is set as true but no accelerator is found, then device pinned memory won't be used.
+  super().__init__(loader)
+2026-08-20 00:17:34,405 INFO Class weights: [1.260793924331665, 0.8286041021347046]
+2026-08-20 00:17:34,408 INFO Starting training: pallor_palm (mobilenet_v3_small) for 25 epochs
+2026-08-20 00:17:34,410 INFO Backbone frozen for first 5 epochs
+2026-08-20 00:18:43,752 INFO Epoch   1/25  train_loss=0.6853  train_acc=0.620  val_loss=0.5738  val_acc=0.743  lr=3.0e-03  69.3s
+2026-08-20 00:18:43,773 INFO   → Saved best model (val_acc=0.743)
+2026-08-20 00:19:41,261 INFO Epoch   2/25  train_loss=0.6207  train_acc=0.669  val_loss=0.7929  val_acc=0.601  lr=3.0e-03  57.5s
+2026-08-20 00:20:39,179 INFO Epoch   3/25  train_loss=0.5847  train_acc=0.709  val_loss=0.4392  val_acc=0.795  lr=3.0e-03  57.9s
+2026-08-20 00:20:39,203 INFO   → Saved best model (val_acc=0.795)
+2026-08-20 00:21:37,449 INFO Epoch   4/25  train_loss=0.5386  train_acc=0.732  val_loss=0.5460  val_acc=0.764  lr=3.0e-03  58.2s
+2026-08-20 00:22:36,107 INFO Epoch   5/25  train_loss=0.5229  train_acc=0.748  val_loss=0.5507  val_acc=0.729  lr=3.0e-03  58.7s
+2026-08-20 00:22:36,110 INFO Backbone unfrozen at epoch 6
+2026-08-20 00:23:46,037 INFO Epoch   6/25  train_loss=0.4329  train_acc=0.799  val_loss=0.4359  val_acc=0.811  lr=3.0e-04  69.9s
+2026-08-20 00:23:46,055 INFO   → Saved best model (val_acc=0.811)
+2026-08-20 00:24:54,842 INFO Epoch   7/25  train_loss=0.3678  train_acc=0.832  val_loss=0.3323  val_acc=0.861  lr=3.0e-04  68.8s
+2026-08-20 00:24:54,860 INFO   → Saved best model (val_acc=0.861)
+2026-08-20 00:26:04,925 INFO Epoch   8/25  train_loss=0.3277  train_acc=0.858  val_loss=0.2484  val_acc=0.884  lr=3.0e-04  70.1s
+2026-08-20 00:26:04,944 INFO   → Saved best model (val_acc=0.884)
+2026-08-20 00:27:16,340 INFO Epoch   9/25  train_loss=0.2884  train_acc=0.877  val_loss=0.2564  val_acc=0.915  lr=3.0e-04  71.4s
+2026-08-20 00:27:16,359 INFO   → Saved best model (val_acc=0.915)
+2026-08-20 00:28:28,423 INFO Epoch  10/25  train_loss=0.2622  train_acc=0.892  val_loss=0.1609  val_acc=0.933  lr=3.0e-04  72.1s
+2026-08-20 00:28:28,443 INFO   → Saved best model (val_acc=0.933)
+2026-08-20 00:30:02,588 INFO Epoch  11/25  train_loss=0.2487  train_acc=0.895  val_loss=0.2798  val_acc=0.869  lr=3.0e-04  94.1s
+2026-08-20 00:31:14,653 INFO Epoch  12/25  train_loss=0.2117  train_acc=0.913  val_loss=0.1893  val_acc=0.915  lr=3.0e-04  72.1s
